@@ -1,0 +1,36 @@
+[project]
+name = "upgrade-dependencies"
+version = "0.1.0"
+description = "Creates PRs for dependency updates in python projects"
+readme = "README.md"
+license = {file = "LICENSE"}
+authors = [
+    { name = "Robbie van Leeuwen", email = "robbie.vanleeuwen@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "typer>=0.13.1",
+]
+
+[project.scripts]
+upgrade-dependencies = "upgrade_dependencies.main:main"
+
+[dependency-groups]
+dev = [
+    "notebook==7.2.2",
+    "pre-commit==4.0.1",
+    "ruff==0.7.4",
+    "pyright==1.1.389",
+]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.13"
+include = ["src"]
+exclude = ["**/__init__.py"]
+strict = ["src"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

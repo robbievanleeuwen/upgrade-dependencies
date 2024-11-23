@@ -1,0 +1,40 @@
+target-version = "py313"
+
+[lint]
+select = [
+  "A",      # warn about shadowing built-ins
+  "B",      # flake8-bugbear
+  "C4",     # flake8-comprehensions
+  "COM",    # flake8-commas
+  "D",      # pydocstyle
+  "DOC",    # pydoclint
+  "E",      # pycodestyle errors
+  "EM",     # flake8-errmsg
+  "F",      # pyflakes
+  "FA",     # flake8-future-annotations
+  "I",      # isort
+  "ICN",    # flake8-import-conventions
+  "ISC",    # flake8-implicit-str-concat
+  "N",      # pep8-naming
+  "NPY",    # NumPy-specific rules
+  "PERF",   # Perflint
+  "PT",     # flake8-pytest-style
+  "RUF",    # Ruff-specific
+  "S",      # flake8-bandit
+  "SIM",    # flake8-simplify
+  "TCH",    # flake8-type-checking
+  "UP",     # pyupgrade
+  "W",      # pycodestyle warnings
+]
+ignore = []
+
+[lint.per-file-ignores]
+"tests/*" = ["S101"]
+"__init__.py*" = ["F401"]
+"typings/*" = ["N801", "N803"]
+
+[lint.pydocstyle]
+convention = "google"
+
+[format]
+docstring-code-format = true

@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+env:
+  UV_VERSION: "0.5.4"
+  DEFAULT_PYTHON_VERSION: "3.13"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pre-commit:
+    name: pre-commit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Install uv version ${{ env.UV_VERSION }}
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+
+      - name: Install python ${{ env.DEFAULT_PYTHON_VERSION }} using uv
+        run: uv python install ${{ env.DEFAULT_PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync -p ${{ env.DEFAULT_PYTHON_VERSION }} --frozen
+
+      - name: Run pre-commit
+        run: uv run -p ${{ env.DEFAULT_PYTHON_VERSION }} --no-sync pre-commit run --all-files --color always --show-diff-on-failure
+
+  type-checking:
+    name: type-checking
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Install uv version ${{ env.UV_VERSION }}
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+
+      - name: Install python ${{ env.DEFAULT_PYTHON_VERSION }} using uv
+        run: uv python install ${{ env.DEFAULT_PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync -p ${{ env.DEFAULT_PYTHON_VERSION }} --frozen
+
+      - name: Run pyright
+        run: uv run -p ${{ env.DEFAULT_PYTHON_VERSION }} --no-sync pyright
