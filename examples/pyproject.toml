@@ -1,0 +1,121 @@
+[project]
+name = "sectionproperties"
+version = "3.7.1"
+description = "A python package for the analysis of arbitrary cross-sections using the finite element method."
+readme = "README.md"
+license = {file = "LICENSE"}
+authors = [
+    { name = "Robbie van Leeuwen", email = "robbie.vanleeuwen@gmail.com" }
+]
+maintainers = [
+   { name = "Robbie van Leeuwen", email = "robbie.vanleeuwen@gmail.com" },
+   { name = "Connor Ferster", email = "connorferster@gmail.comm" }
+]
+keywords = [
+    "cross-section",
+    "structural-engineering",
+    "finite-element-analysis",
+    "computational-mechanics",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Topic :: Scientific/Engineering",
+    "Environment :: Console",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+requires-python = ">=3.10,<3.13"
+dependencies = [
+    "numpy>=1.26.4",
+    "scipy~=1.14.1",
+    "matplotlib~=3.9.2",
+    "shapely~=2.0.6",
+    "cytriangle~=1.0.3",
+    "rich[jupyter]~=13.9.3",
+    "more-itertools~=10.5.0",
+]
+
+[project.urls]
+Homepage = "https://sectionproperties.readthedocs.io"
+Documentation = "https://sectionproperties.readthedocs.io"
+Repository = "https://github.com/robbievanleeuwen/section-properties"
+Issues = "https://github.com/robbievanleeuwen/section-properties/issues"
+Changelog = "https://github.com/robbievanleeuwen/section-properties/releases"
+
+[project.optional-dependencies]
+numba = [
+    "numba~=0.60.0",
+]
+rhino = [
+    "rhino3dm~=8.9.0",
+    "rhino-shapley-interop~=0.0.4",
+]
+dxf = [
+    "cad-to-shapely~=0.3.2",
+]
+pardiso = [
+    "pypardiso~=0.4.6; platform_system == 'Windows' or platform_system == 'Linux'"
+]
+
+[dependency-groups]
+dev = [
+    "ipympl==0.9.4",
+    "notebook==7.2.2",
+    "sphinx-autobuild==2024.10.03",
+]
+docs = [
+    "furo==2024.8.6",
+    "sphinx==8.1.3",
+    "ipykernel==6.29.5",
+    "ipython==8.29.0",
+    "nbsphinx==0.9.5",
+    "nbconvert==7.16.4",
+    "sphinx-copybutton==0.5.2",
+    "sphinxext-opengraph==0.9.1",
+]
+lint = [
+    "pre-commit==4.0.1",
+    "ruff==0.7.4",
+    "pyright==1.1.389",
+]
+test = [
+    "pytest==8.3.3",
+    "pytest-benchmark[histogram]==5.1.0",
+    "pytest-check==2.4.1",
+    "coverage[toml]==7.6.7",
+]
+
+[tool.uv]
+default-groups = ["dev", "docs", "lint", "test"]
+
+[tool.pyright]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.10"
+include = ["src"]
+exclude = ["**/__init__.py"]
+strict = ["src"]
+
+[tool.coverage.paths]
+source = ["src", "*/site-packages"]
+tests = ["tests", "*/tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["sectionproperties", "tests"]
+omit = ["*/benchmarks/*"]
+
+[tool.pytest.ini_options]
+markers = [
+    "benchmark_suite: entire benchmark test suite (select with '-m benchmark_suite')",
+    "benchmark_geom: geometry benchmark tests (select with '-m benchmark_geom')",
+    "benchmark_mesh: mesh benchmark tests (select with '-m benchmark_mesh')",
+    "benchmark_analysis: analysis benchmark tests (select with '-m benchmark_analysis')",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
