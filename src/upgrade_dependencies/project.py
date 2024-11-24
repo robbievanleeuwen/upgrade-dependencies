@@ -26,23 +26,26 @@ class Project:
 
     def __init__(
         self,
-        pyproject_path: str = "pyproject.toml",
-        workflows_dir: str | None = None,
-        pre_commit_path: str | None = None,
+        project_path: str,
         is_async: bool = True,
         gh_pat: str | None = None,
     ) -> None:
         """_summary_.
 
         Args:
-            pyproject_path: _description_
-            workflows_dir: _description_
-            pre_commit_path: _description_
+            project_path: _description_
             is_async: _description_
             gh_pat: _description_
         """
+        # check pyproject.toml exists
+        ppt_file_path = Path(project_path) / "pyproject.toml"
+
+        if not ppt_file_path.exists():
+            msg = f"{ppt_file_path} does not exist."
+            raise ValueError(msg)
+
         # load pyproject.toml
-        with Path(pyproject_path).open("r") as f:
+        with Path(ppt_file_path).open("r") as f:
             cfg = tomlkit.load(fp=f).unwrap()
 
         # get project name
@@ -105,8 +108,11 @@ class Project:
         for proj_dep in project_dependencies:
             self.dependencies.append(Dependency(**proj_dep))
 
+        # workflows dir
+        workflows_dir = Path(project_path) / ".github" / "workflows"
+
         # uv version
-        if workflows_dir is not None:
+        if workflows_dir.exists():
             uv_version = extract_from_yml_directory(
                 gha_path=workflows_dir,
                 variable_name="UV_VERSION",
@@ -132,7 +138,7 @@ class Project:
         # parse github actions
         self.github_dependencies = []
 
-        if workflows_dir is not None:
+        if workflows_dir.exists():
             github_actions = extract_from_yml_directory(
                 gha_path=workflows_dir,
                 variable_name="uses",
@@ -169,8 +175,11 @@ class Project:
                     ),
                 )
 
+        # pre-commit dir
+        pre_commit_path = Path(project_path) / ".pre-commit-config.yaml"
+
         # parse pre-commit-config
-        if pre_commit_path is not None:
+        if pre_commit_path.exists():
             pre_commit_repos = parse_pre_commit_config(file_path=pre_commit_path)
 
             for pc_repo in pre_commit_repos:

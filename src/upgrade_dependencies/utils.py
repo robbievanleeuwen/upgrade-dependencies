@@ -48,7 +48,7 @@ def extract_variable_from_file(
 
 
 def extract_from_yml_directory(
-    gha_path: str,
+    gha_path: Path,
     variable_name: str,
 ) -> list[str]:
     """Function to process all YAML files in a directory.
@@ -77,7 +77,7 @@ def extract_from_yml_directory(
     return values
 
 
-def parse_pre_commit_config(file_path: str) -> list[dict[str, str]]:
+def parse_pre_commit_config(file_path: Path) -> list[dict[str, str]]:
     """_summary_.
 
     Args:
@@ -86,7 +86,7 @@ def parse_pre_commit_config(file_path: str) -> list[dict[str, str]]:
     Returns:
         _description_
     """
-    with Path(file_path).open("r") as f:
+    with file_path.open("r") as f:
         data = yaml.safe_load(f)
 
     repos_info: list[dict[str, str]] = []
