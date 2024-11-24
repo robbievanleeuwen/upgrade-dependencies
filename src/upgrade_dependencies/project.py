@@ -6,8 +6,12 @@ from typing import Any
 
 import tomlkit
 from packaging.requirements import InvalidRequirement, Requirement
+from packaging.specifiers import SpecifierSet
+from packaging.version import Version
 
+import upgrade_dependencies.utils as utils
 from upgrade_dependencies.dependency import Dependency
+from upgrade_dependencies.github_dependency import GithubDependency
 
 
 class Project:
@@ -15,16 +19,19 @@ class Project:
 
     name: str
     dependencies: list[Dependency]
+    github_dependencies: list[GithubDependency]
 
     def __init__(
         self,
         pyproject_path: str = "pyproject.toml",
+        workflows_dir: str = ".github/workflows/",
         is_async: bool = True,
     ) -> None:
         """_summary_.
 
         Args:
             pyproject_path: _description_
+            workflows_dir: _description_
             is_async: _description_
         """
         # load pyproject.toml
@@ -91,12 +98,71 @@ class Project:
         for proj_dep in project_dependencies:
             self.dependencies.append(Dependency(**proj_dep))
 
+        # uv version
+        uv_version = utils.extract_from_yml_directory(
+            gha_path=workflows_dir,
+            extract_method=utils.extract_uv_version_from_file,
+        )
+
+        if len(uv_version) > 0:
+            self.dependencies.append(
+                Dependency(
+                    package_name="uv",
+                    specifier=SpecifierSet(f"=={uv_version[0]}"),
+                    base=False,
+                    group="uv",
+                ),
+            )
+
         # fetch pypi data
         if is_async:
             self.pypi_dependency_data_async()
         else:
             for dep in self.dependencies:
                 dep.save_pypi_data()
+
+        # parse github actions
+        github_actions = utils.extract_from_yml_directory(
+            gha_path=workflows_dir,
+            extract_method=utils.extract_uses_from_file,
+        )
+        github_actions = list(set(github_actions))  # get unique set
+
+        # add github actions objects
+        self.github_dependencies = []
+
+        for gha in github_actions:
+            if "@" in gha:
+                action, version = gha.split("@", maxsplit=1)
+            else:
+                action = gha
+                version = ""
+
+            owner, repo = action.split("/", maxsplit=1)
+
+            # handle additional "/"" e.g. pandoc/actions/setup@v1
+            if "/" in repo:
+                repo = repo.split("/")[0]
+
+            # handle branch name in tag e.g. pypa/gh-action-pypi-publish@release/v1
+            if "/" in version:
+                version = version.split("/")[-1]
+
+            v = Version(version)
+
+            self.github_dependencies.append(
+                GithubDependency(
+                    owner=owner,
+                    repo=repo,
+                    specifier=SpecifierSet(f"~={v.major}.{v.minor}"),
+                    action=True,
+                    pre_commit=False,
+                ),
+            )
+
+        # fetch github data
+        for gh_dep in self.github_dependencies:
+            gh_dep.save_github_data()
 
     @property
     def base_dependencies(self) -> list[Dependency]:
