@@ -240,6 +240,83 @@ def needs_updating(
             text.append(str(dep.get_latest_version()), style="green")
             counter += 1
 
+    if counter == 0:
+        text.append("All version are up to date!")
+
+    rprint(Panel(text, title=title, title_align="left"))
+
+
+@app.command()
+def latest_versions(
+    project_path: str = "",
+    base: bool = True,
+    optional_deps: bool = True,
+    group_deps: bool = True,
+    github_actions: bool = False,
+    pre_commit: bool = True,
+):
+    """List the dependencies that aren't pinned to the latest version.
+
+    Args:
+        project_path: Path to the project. Defaults to the current working directory.
+        base: If set to True, includes the base dependencies. Defaults to True.
+        optional_deps: If set to True, includes the optional dependencies. Defaults to
+            True.
+        group_deps: If set to True, includes the dependency groups. Defaults to True.
+        github_actions: If set to True, includes the github actions dependencies.
+            Defaults to False.
+        pre_commit: If set to True, includes the pre-commit dependencies. Defaults to
+            True.
+    """
+    # create project object
+    project = Project(
+        project_path=project_path,
+        gh_pat=GH_PAT,
+    )
+
+    # fetch relevant data
+    if base or optional_deps or group_deps:
+        project.pypi_dependency_data_async()
+
+    if github_actions or pre_commit:
+        project.github_dependency_data_async()
+
+    title = Text("Latest Versions", style="bold")
+    text = Text()
+    deps: list[Dependency | GithubDependency] = []
+
+    if base:
+        deps.extend(project.base_dependencies)
+
+    if optional_deps:
+        deps.extend(project.optional_dependencies)
+
+    if group_deps:
+        deps.extend(project.group_dependencies)
+
+    if github_actions:
+        deps.extend(project.github_actions_dependencies)
+
+    if pre_commit:
+        deps.extend(project.pre_commit_dependencies)
+
+    # use a counter to help with new lines
+    counter = 0
+
+    for dep in deps:
+        if not dep.is_specifier_latest():
+            if counter > 0:
+                text.append("\n")
+
+            text.append(f"{dep.package_name}: ")
+            text.append(str(dep.specifier), style="red")
+            text.append(" -> ")
+            text.append(str(dep.get_latest_version()), style="green")
+            counter += 1
+
+    if counter == 0:
+        text.append("All version are up to date!")
+
     rprint(Panel(text, title=title, title_align="left"))
 
 
