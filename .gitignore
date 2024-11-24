@@ -24,6 +24,7 @@ htmlcov/
 
 # jupyter notebook
 .ipynb_checkpoints
+examples/
 
 # ruff
 .ruff_cache

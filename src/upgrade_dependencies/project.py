@@ -51,7 +51,7 @@ class Project:
             for extra, deps in cfg["project"]["optional-dependencies"].items():
                 for dep in deps:
                     req = parse_requirement(requirement=dep)
-                    self.base_dependencies.append(
+                    self.optional_dependencies.append(
                         Dependency(
                             package_name=req.name,
                             specifier=req.specifier,
@@ -69,7 +69,7 @@ class Project:
             for group, deps in cfg["dependency-groups"].items():
                 for dep in deps:
                     req = parse_requirement(requirement=dep)
-                    self.base_dependencies.append(
+                    self.group_dependencies.append(
                         Dependency(
                             package_name=req.name,
                             specifier=req.specifier,
@@ -77,6 +77,19 @@ class Project:
                             group=group,
                         ),
                     )
+
+    @property
+    def all_dependencies(self) -> list[Dependency]:
+        """_summary_.
+
+        Returns:
+            _description_
+        """
+        return (
+            self.base_dependencies
+            + self.optional_dependencies
+            + self.group_dependencies
+        )
 
     def __repr__(self) -> str:
         """_summary_.
