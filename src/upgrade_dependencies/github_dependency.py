@@ -1,5 +1,6 @@
 """Class for a python project github dependency."""
 
+from datetime import UTC, datetime
 from typing import Any
 
 import httpx
@@ -66,10 +67,78 @@ class GithubDependency:
 
         return self.github_data
 
-    def save_github_data(self) -> None:
-        """_summary_."""
+    def save_github_data(
+        self,
+        gh_pat: str | None = None,
+    ) -> None:
+        """_summary_.
+
+        Args:
+            gh_pat: _description_
+        """
         url = f"https://api.github.com/repos/{self.owner}/{self.repo}/releases/latest"
-        self.github_data = httpx.get(url=url).json()
+
+        if gh_pat is None:
+            response = httpx.get(url=url)
+        else:
+            headers = {"Authorization": f"Bearer {gh_pat}"}
+            response = httpx.get(url=url, headers=headers)
+
+        self.handle_response(response=response)
+
+    async def save_github_data_async(
+        self,
+        gh_pat: str | None = None,
+    ) -> None:
+        """_summary_.
+
+        Args:
+            gh_pat: _description_
+        """
+        url = f"https://api.github.com/repos/{self.owner}/{self.repo}/releases/latest"
+
+        async with httpx.AsyncClient() as client:
+            if gh_pat is None:
+                response = await client.get(url=url)
+            else:
+                headers = {"Authorization": f"Bearer {gh_pat}"}
+                response = await client.get(url=url, headers=headers)
+
+            self.handle_response(response=response)
+
+    def handle_response(
+        self,
+        response: httpx.Response,
+    ) -> None:
+        """_summary_.
+
+        Args:
+            response: _description_
+        """
+        if response.status_code == 200:
+            self.github_data = response.json()
+        elif response.status_code in [401, 403, 404, 429]:
+            reset_time = datetime.fromtimestamp(
+                int(response.headers.get("x-ratelimit-reset")),
+                UTC,
+            )
+            msg = f"{response.status_code} - {response.reason_phrase}."
+
+            if response.reason_phrase == "rate limit exceeded":
+                msg += f" Rate limit reset at {reset_time}."
+            raise RuntimeError(msg)
+        else:
+            msg = "Github API Error."
+            raise RuntimeError(msg)
+
+    @property
+    def package_name(self) -> str:
+        """_summary_.
+
+        Returns:
+            _description_
+        """
+        return f"{self.owner}/{self.repo}"
 
     def __repr__(self) -> str:
         """_summary_.
@@ -79,4 +148,4 @@ class GithubDependency:
         """
         loc = "(gha)" if self.action else "(pre-commit)"
 
-        return f"{self.owner}/{self.repo}: {self.specifier} {loc}"
+        return f"{self.package_name}: {self.specifier} {loc}"

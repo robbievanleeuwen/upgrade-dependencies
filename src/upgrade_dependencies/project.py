@@ -30,6 +30,7 @@ class Project:
         workflows_dir: str | None = None,
         pre_commit_path: str | None = None,
         is_async: bool = True,
+        gh_pat: str | None = None,
     ) -> None:
         """_summary_.
 
@@ -38,6 +39,7 @@ class Project:
             workflows_dir: _description_
             pre_commit_path: _description_
             is_async: _description_
+            gh_pat: _description_
         """
         # load pyproject.toml
         with Path(pyproject_path).open("r") as f:
@@ -188,8 +190,11 @@ class Project:
                 )
 
         # fetch github data
-        for gh_dep in self.github_dependencies:
-            gh_dep.save_github_data()
+        if is_async:
+            self.github_dependency_data_async(gh_pat=gh_pat)
+        else:
+            for gh_dep in self.github_dependencies:
+                gh_dep.save_github_data(gh_pat=gh_pat)
 
     @property
     def base_dependencies(self) -> list[Dependency]:
@@ -232,6 +237,34 @@ class Project:
     def pypi_dependency_data_async(self) -> None:
         """Synchronously fetches PyPI data for all Dependency objects."""
         asyncio.run(self.fetch_all_pypi_data())
+
+    async def fetch_all_github_data(
+        self,
+        gh_pat: str | None = None,
+    ) -> None:
+        """Fetches GitHub data for all dependency objects concurrently.
+
+        Args:
+            gh_pat: _description_
+        """
+        await asyncio.gather(
+            *[
+                gh_dep.save_github_data_async(gh_pat=gh_pat)
+                for gh_dep in self.github_dependencies
+            ],
+            return_exceptions=True,
+        )
+
+    def github_dependency_data_async(
+        self,
+        gh_pat: str | None = None,
+    ) -> None:
+        """Synchronously fetches GitHub data for all dependency objects.
+
+        Args:
+            gh_pat: _description_
+        """
+        asyncio.run(self.fetch_all_github_data(gh_pat=gh_pat))
 
     def __repr__(self) -> str:
         """_summary_.

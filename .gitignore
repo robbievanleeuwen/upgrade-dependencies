@@ -31,3 +31,6 @@ examples/
 
 # mac
 .DS_Store
+
+# GitHub PAT
+gh_pat
