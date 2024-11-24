@@ -67,26 +67,7 @@ class GithubDependency:
 
         return self.github_data
 
-    def save_github_data(
-        self,
-        gh_pat: str | None = None,
-    ) -> None:
-        """_summary_.
-
-        Args:
-            gh_pat: _description_
-        """
-        url = f"https://api.github.com/repos/{self.owner}/{self.repo}/releases/latest"
-
-        if gh_pat is None:
-            response = httpx.get(url=url)
-        else:
-            headers = {"Authorization": f"Bearer {gh_pat}"}
-            response = httpx.get(url=url, headers=headers)
-
-        self.handle_response(response=response)
-
-    async def save_github_data_async(
+    async def save_github_data(
         self,
         gh_pat: str | None = None,
     ) -> None:

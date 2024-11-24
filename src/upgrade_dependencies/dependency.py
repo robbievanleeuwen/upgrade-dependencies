@@ -81,12 +81,7 @@ class Dependency:
 
         return self.pypi_data
 
-    def save_pypi_data(self) -> None:
-        """_summary_."""
-        url = "/".join(["https://pypi.org", "pypi", self.package_name, "json"])
-        self.pypi_data = httpx.get(url=url).json()
-
-    async def save_pypi_data_async(self) -> None:
+    async def save_pypi_data(self) -> None:
         """_summary_."""
         url = "/".join(["https://pypi.org", "pypi", self.package_name, "json"])
 

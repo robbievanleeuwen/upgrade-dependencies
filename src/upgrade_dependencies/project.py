@@ -21,20 +21,19 @@ class Project:
     """_summary_."""
 
     name: str
+    gh_pat: str | None
     dependencies: list[Dependency]
     github_dependencies: list[GithubDependency]
 
     def __init__(
         self,
         project_path: str,
-        is_async: bool = True,
         gh_pat: str | None = None,
     ) -> None:
         """_summary_.
 
         Args:
             project_path: _description_
-            is_async: _description_
             gh_pat: _description_
         """
         # check pyproject.toml exists
@@ -50,6 +49,9 @@ class Project:
 
         # get project name
         self.name = cfg["project"]["name"]
+
+        # save GitHub PAT
+        self.gh_pat = gh_pat
 
         # create list of dependencies to add
         project_dependencies: list[dict[str, Any]] = []
@@ -128,13 +130,6 @@ class Project:
                     ),
                 )
 
-        # fetch pypi data
-        if is_async:
-            self.pypi_dependency_data_async()
-        else:
-            for dep in self.dependencies:
-                dep.save_pypi_data()
-
         # parse github actions
         self.github_dependencies = []
 
@@ -198,13 +193,6 @@ class Project:
                     ),
                 )
 
-        # fetch github data
-        if is_async:
-            self.github_dependency_data_async(gh_pat=gh_pat)
-        else:
-            for gh_dep in self.github_dependencies:
-                gh_dep.save_github_data(gh_pat=gh_pat)
-
     @property
     def base_dependencies(self) -> list[Dependency]:
         """_summary_.
@@ -224,6 +212,21 @@ class Project:
         return [dep for dep in self.dependencies if dep.extra]
 
     @property
+    def optional_dependencies_grouped(self) -> dict[str, list[Dependency]]:
+        """_summary_.
+
+        Returns:
+            _description_
+        """
+        grouped_deps: dict[str, list[Dependency]] = {}
+
+        for opt_dep in self.optional_dependencies:
+            if isinstance(opt_dep.extra, str):
+                grouped_deps.setdefault(opt_dep.extra, []).append(opt_dep)
+
+        return grouped_deps
+
+    @property
     def group_dependencies(self) -> list[Dependency]:
         """_summary_.
 
@@ -232,10 +235,48 @@ class Project:
         """
         return [dep for dep in self.dependencies if dep.group]
 
+    @property
+    def group_dependencies_grouped(self) -> dict[str, list[Dependency]]:
+        """_summary_.
+
+        Returns:
+            _description_
+        """
+        grouped_deps: dict[str, list[Dependency]] = {}
+
+        for group_dep in self.group_dependencies:
+            if isinstance(group_dep.group, str):
+                grouped_deps.setdefault(group_dep.group, []).append(group_dep)
+
+        return grouped_deps
+
+    @property
+    def github_actions(self) -> list[GithubDependency]:
+        """_summary_.
+
+        Returns:
+            _description_
+        """
+        return [gh_dep for gh_dep in self.github_dependencies if gh_dep.action]
+
+    @property
+    def pre_commit_actions(self) -> list[GithubDependency]:
+        """_summary_.
+
+        Returns:
+            _description_
+        """
+        return [gh_dep for gh_dep in self.github_dependencies if gh_dep.pre_commit]
+
+    def fetch_all_data(self) -> None:
+        """Fetches all (PyPI and GitHub) data."""
+        self.pypi_dependency_data_async()
+        self.github_dependency_data_async()
+
     async def fetch_all_pypi_data(self) -> None:
         """Fetches PyPI data for all Dependency objects concurrently."""
         results = await asyncio.gather(
-            *[dep.save_pypi_data_async() for dep in self.dependencies],
+            *[dep.save_pypi_data() for dep in self.dependencies],
             return_exceptions=True,
         )
 
@@ -247,33 +288,19 @@ class Project:
         """Synchronously fetches PyPI data for all Dependency objects."""
         asyncio.run(self.fetch_all_pypi_data())
 
-    async def fetch_all_github_data(
-        self,
-        gh_pat: str | None = None,
-    ) -> None:
-        """Fetches GitHub data for all dependency objects concurrently.
-
-        Args:
-            gh_pat: _description_
-        """
+    async def fetch_all_github_data(self) -> None:
+        """Fetches GitHub data for all dependency objects concurrently."""
         await asyncio.gather(
             *[
-                gh_dep.save_github_data_async(gh_pat=gh_pat)
+                gh_dep.save_github_data(gh_pat=self.gh_pat)
                 for gh_dep in self.github_dependencies
             ],
             return_exceptions=True,
         )
 
-    def github_dependency_data_async(
-        self,
-        gh_pat: str | None = None,
-    ) -> None:
-        """Synchronously fetches GitHub data for all dependency objects.
-
-        Args:
-            gh_pat: _description_
-        """
-        asyncio.run(self.fetch_all_github_data(gh_pat=gh_pat))
+    def github_dependency_data_async(self) -> None:
+        """Synchronously fetches GitHub data for all dependency objects."""
+        asyncio.run(self.fetch_all_github_data())
 
     def __repr__(self) -> str:
         """_summary_.
