@@ -43,6 +43,20 @@ class GithubDependency:
         """
         return Version(version=self.get_github_data().get("tag_name", ""))
 
+    def is_specifier_latest(self) -> bool:
+        """_summary_.
+
+        Returns:
+            _description_
+        """
+        latest = self.get_latest_version()
+
+        for spec in sorted(self.specifier, key=str):
+            if Version(spec.version) == latest:
+                return True
+
+        return False
+
     def needs_update(self) -> bool:
         """_summary_.
 

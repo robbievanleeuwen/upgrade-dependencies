@@ -9,6 +9,7 @@ from rich.console import Group
 from rich.panel import Panel
 from rich.text import Text
 
+from upgrade_dependencies.dependency import Dependency
 from upgrade_dependencies.project import Project
 
 app = typer.Typer()
@@ -133,7 +134,7 @@ def check_dependency(
         gh_pat=GH_PAT,
     )
 
-    for d in project.dependencies:
+    for d in project.dependencies + project.github_dependencies:
         if d.package_name == dependency:
             dep = d
             break
@@ -141,26 +142,30 @@ def check_dependency(
         rprint(f"Cannot find {dependency} in {project.name}.")
         return
 
-    asyncio.run(dep.save_pypi_data())
-
-    rprint(f"Dependency: {dep.package_name}")
-    rprint(f"Version: {dep.specifier}")
-    rprint(f"Latest version: {dep.get_latest_version()}")
-    rprint(f"Needs Updating: {dep.needs_update()}")
-
-
-@app.command()
-def goodbye(name: str, formal: bool = False):
-    """_summary_.
-
-    Args:
-        name: _description_
-        formal: _description_. Defaults to False.
-    """
-    if formal:
-        rprint(f"Goodbye Ms. {name}. Have a good day.")
+    if isinstance(dep, Dependency):
+        save_method = dep.save_pypi_data
     else:
-        rprint(f"Bye {name}!")
+        save_method = dep.save_github_data
+
+    asyncio.run(save_method())
+
+    title = Text("Dependency Check", style="bold")
+    needs_update = dep.needs_update()
+
+    text = Text(dep.package_name)
+    text.append(str(dep.specifier), style="green")
+    text.append("\n")
+    utd = (
+        Text("Needs updating!", style="red")
+        if needs_update
+        else Text("Up to date!", style="green")
+    )
+    text.append(utd)
+    text.append("\n")
+    text.append("Latest version: ")
+    text.append(str(dep.get_latest_version()), style="red" if needs_update else "green")
+
+    rprint(Panel(text, title=title, title_align="left"))
 
 
 def main():
