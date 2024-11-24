@@ -251,7 +251,7 @@ class Project:
         return grouped_deps
 
     @property
-    def github_actions(self) -> list[GithubDependency]:
+    def github_actions_dependencies(self) -> list[GithubDependency]:
         """_summary_.
 
         Returns:
@@ -260,7 +260,7 @@ class Project:
         return [gh_dep for gh_dep in self.github_dependencies if gh_dep.action]
 
     @property
-    def pre_commit_actions(self) -> list[GithubDependency]:
+    def pre_commit_dependencies(self) -> list[GithubDependency]:
         """_summary_.
 
         Returns:

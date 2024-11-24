@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+from typing import TYPE_CHECKING
 
 import typer
 from rich import print as rprint
@@ -11,6 +12,9 @@ from rich.text import Text
 
 from upgrade_dependencies.dependency import Dependency
 from upgrade_dependencies.project import Project
+
+if TYPE_CHECKING:
+    from upgrade_dependencies.github_dependency import GithubDependency
 
 app = typer.Typer()
 GH_PAT = os.getenv("GH_PAT")
@@ -91,14 +95,14 @@ def list_dependencies(project_path: str = ""):
     title = Text("Github Actions Dependencies", style="bold")
     text = Text()
 
-    for idx, gh_dep in enumerate(project.github_actions):
+    for idx, gh_dep in enumerate(project.github_actions_dependencies):
         text.append(gh_dep.package_name)
         text.append(str(gh_dep.specifier), style="green")
 
-        if idx < len(project.github_actions) - 1:
+        if idx < len(project.github_actions_dependencies) - 1:
             text.append("\n")
 
-    if len(project.github_actions) > 0:
+    if len(project.github_actions_dependencies) > 0:
         rprint()
         rprint(Panel(text, title=title, title_align="left"))
 
@@ -106,14 +110,14 @@ def list_dependencies(project_path: str = ""):
     title = Text("Pre-commit Dependencies", style="bold")
     text = Text()
 
-    for idx, pc_dep in enumerate(project.pre_commit_actions):
+    for idx, pc_dep in enumerate(project.pre_commit_dependencies):
         text.append(pc_dep.package_name)
         text.append(str(pc_dep.specifier), style="green")
 
-        if idx < len(project.pre_commit_actions) - 1:
+        if idx < len(project.pre_commit_dependencies) - 1:
             text.append("\n")
 
-    if len(project.pre_commit_actions) > 0:
+    if len(project.pre_commit_dependencies) > 0:
         rprint()
         rprint(Panel(text, title=title, title_align="left"))
 
@@ -164,6 +168,77 @@ def check_dependency(
     text.append("\n")
     text.append("Latest version: ")
     text.append(str(dep.get_latest_version()), style="red" if needs_update else "green")
+
+    rprint(Panel(text, title=title, title_align="left"))
+
+
+@app.command()
+def needs_updating(
+    project_path: str = "",
+    base: bool = True,
+    optional_deps: bool = True,
+    group_deps: bool = True,
+    github_actions: bool = True,
+    pre_commit: bool = True,
+):
+    """List the dependencies that need updating.
+
+    Args:
+        project_path: Path to the project. Defaults to the current working directory.
+        base: If set to True, includes the base dependencies. Defaults to True.
+        optional_deps: If set to True, includes the optional dependencies. Defaults to
+            True.
+        group_deps: If set to True, includes the dependency groups. Defaults to True.
+        github_actions: If set to True, includes the github actions dependencies.
+            Defaults to True.
+        pre_commit: If set to True, includes the pre-commit dependencies. Defaults to
+            True.
+    """
+    # create project object
+    project = Project(
+        project_path=project_path,
+        gh_pat=GH_PAT,
+    )
+
+    # fetch relevant data
+    if base or optional_deps or group_deps:
+        project.pypi_dependency_data_async()
+
+    if github_actions or pre_commit:
+        project.github_dependency_data_async()
+
+    title = Text("Dependencies to Update", style="bold")
+    text = Text()
+    deps: list[Dependency | GithubDependency] = []
+
+    if base:
+        deps.extend(project.base_dependencies)
+
+    if optional_deps:
+        deps.extend(project.optional_dependencies)
+
+    if group_deps:
+        deps.extend(project.group_dependencies)
+
+    if github_actions:
+        deps.extend(project.github_actions_dependencies)
+
+    if pre_commit:
+        deps.extend(project.pre_commit_dependencies)
+
+    # use a counter to help with new lines
+    counter = 0
+
+    for dep in deps:
+        if dep.needs_update():
+            if counter > 0:
+                text.append("\n")
+
+            text.append(f"{dep.package_name}: ")
+            text.append(str(dep.specifier), style="red")
+            text.append(" -> ")
+            text.append(str(dep.get_latest_version()), style="green")
+            counter += 1
 
     rprint(Panel(text, title=title, title_align="left"))
 

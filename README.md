@@ -9,6 +9,7 @@ Creates PRs for dependency updates in python projects
 - [x] Get uv dependency from github actions
 - [x] Get dependencies from pre-commit
 - [x] Github auth & async
+- [ ] Create dependency abstract class
 - [ ] Implement CLI
 - [ ] Create changes to files
 - [ ] Create pull request
