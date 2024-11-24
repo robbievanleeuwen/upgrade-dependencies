@@ -1,6 +1,8 @@
 """Class for a python project."""
 
+import asyncio
 from pathlib import Path
+from typing import Any
 
 import tomlkit
 from packaging.requirements import InvalidRequirement, Requirement
@@ -12,84 +14,131 @@ class Project:
     """_summary_."""
 
     name: str
-    base_dependencies: list[Dependency]
-    optional_dependencies: list[Dependency]
-    group_dependencies: list[Dependency]
+    dependencies: list[Dependency]
 
     def __init__(
         self,
-        filename: str = "pyproject.toml",
+        pyproject_path: str = "pyproject.toml",
+        is_async: bool = True,
     ) -> None:
         """_summary_.
 
         Args:
-            filename: _description_
+            pyproject_path: _description_
+            is_async: _description_
         """
         # load pyproject.toml
-        with Path(filename).open("r") as f:
+        with Path(pyproject_path).open("r") as f:
             cfg = tomlkit.load(fp=f).unwrap()
 
         # get project name
         self.name = cfg["project"]["name"]
 
-        # add base dependencies
-        self.base_dependencies = []
+        # create list of dependencies to add
+        project_dependencies: list[dict[str, Any]] = []
 
+        # base dependencies
         for dep in cfg["project"]["dependencies"]:
             # parse requirement
             req = parse_requirement(requirement=dep)
-            self.base_dependencies.append(
-                Dependency(package_name=req.name, specifier=req.specifier),
+            project_dependencies.append(
+                {
+                    "package_name": req.name,
+                    "specifier": req.specifier,
+                    "base": True,
+                    "extra": None,
+                    "group": None,
+                },
             )
 
-        # add optional dependencies
-        self.optional_dependencies = []
-
+        # optional dependencies
         opt_deps = cfg["project"].get("optional-dependencies")
 
         if opt_deps:
             for extra, deps in cfg["project"]["optional-dependencies"].items():
                 for dep in deps:
                     req = parse_requirement(requirement=dep)
-                    self.optional_dependencies.append(
-                        Dependency(
-                            package_name=req.name,
-                            specifier=req.specifier,
-                            base=False,
-                            extra=extra,
-                        ),
+                    project_dependencies.append(
+                        {
+                            "package_name": req.name,
+                            "specifier": req.specifier,
+                            "base": False,
+                            "extra": extra,
+                            "group": None,
+                        },
                     )
 
-        # add dependency groups
-        self.group_dependencies = []
-
+        # dependency groups
         dep_groups = cfg.get("dependency-groups")
 
         if dep_groups:
             for group, deps in cfg["dependency-groups"].items():
                 for dep in deps:
                     req = parse_requirement(requirement=dep)
-                    self.group_dependencies.append(
-                        Dependency(
-                            package_name=req.name,
-                            specifier=req.specifier,
-                            base=False,
-                            group=group,
-                        ),
+                    project_dependencies.append(
+                        {
+                            "package_name": req.name,
+                            "specifier": req.specifier,
+                            "base": False,
+                            "extra": None,
+                            "group": group,
+                        },
                     )
 
+        # add dependency objects
+        self.dependencies = []
+
+        for proj_dep in project_dependencies:
+            self.dependencies.append(Dependency(**proj_dep))
+
+        # fetch pypi data
+        if is_async:
+            self.pypi_dependency_data_async()
+        else:
+            for dep in self.dependencies:
+                dep.save_pypi_data()
+
     @property
-    def all_dependencies(self) -> list[Dependency]:
+    def base_dependencies(self) -> list[Dependency]:
         """_summary_.
 
         Returns:
             _description_
         """
-        return (
-            self.base_dependencies
-            + self.optional_dependencies
-            + self.group_dependencies
+        return [dep for dep in self.dependencies if dep.base]
+
+    @property
+    def optional_dependencies(self) -> list[Dependency]:
+        """_summary_.
+
+        Returns:
+            _description_
+        """
+        return [dep for dep in self.dependencies if dep.extra]
+
+    @property
+    def group_dependencies(self) -> list[Dependency]:
+        """_summary_.
+
+        Returns:
+            _description_
+        """
+        return [dep for dep in self.dependencies if dep.group]
+
+    async def fetch_all_pypi_data(self) -> None:
+        """Fetches PyPI data for all Dependency objects concurrently."""
+        results = await asyncio.gather(
+            *[dep.save_pypi_data_async() for dep in self.dependencies],
+            return_exceptions=True,
         )
+
+        for dep, result in zip(self.dependencies, results, strict=False):
+            if isinstance(result, Exception):
+                print(f"Failed to fetch data for {dep.package_name}: {result}")
+
+    def pypi_dependency_data_async(self) -> None:
+        """Synchronously fetches PyPI data for all Dependency objects."""
+        asyncio.run(self.fetch_all_pypi_data())
 
     def __repr__(self) -> str:
         """_summary_.
