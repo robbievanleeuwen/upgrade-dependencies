@@ -86,6 +86,15 @@ class Dependency:
         """
         raise NotImplementedError
 
+    @property
+    def short_name(self) -> str:
+        """_summary_.
+
+        Returns:
+            _description_
+        """
+        raise NotImplementedError
+
     def __repr__(self) -> str:
         """_summary_.
 
@@ -158,6 +167,15 @@ class PyPIDependency(Dependency):
             return f" ({self.extra})"
         else:
             return f" ({self.group})"
+
+    @property
+    def short_name(self) -> str:
+        """_summary_.
+
+        Returns:
+            _description_
+        """
+        return self.package_name
 
 
 class GitHubDependency(Dependency):
@@ -255,3 +273,12 @@ class GitHubDependency(Dependency):
             _description_
         """
         return " (gha)" if self.action else " (pre-commit)"
+
+    @property
+    def short_name(self) -> str:
+        """_summary_.
+
+        Returns:
+            _description_
+        """
+        return self.repo

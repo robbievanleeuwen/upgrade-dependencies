@@ -356,18 +356,14 @@ class Project:
     def update_dependency(
         self,
         dependency: Dependency,
-        version: str | None = None,
+        version: str,
     ) -> None:
         """_summary_.
 
         Args:
             dependency: _description_
-            version: _description_. Defaults to None.
+            version: _description_
         """
-        # get version
-        if version is None:
-            version = str(dependency.get_latest_version())
-
         # update pypi dependencies
         if isinstance(dependency, PyPIDependency):
             # handle special case uv, lives in github actions
@@ -410,8 +406,8 @@ class Project:
                     raise RuntimeError(msg)
 
                 # write new pyproject.toml file
-                temp_ppt = ppt_file_path.with_suffix(".temp")
-                with temp_ppt.open("w") as temp_f:
+                # temp_ppt = ppt_file_path.with_suffix(".temp")
+                with Path(ppt_file_path).open("w") as temp_f:
                     tomlkit.dump(data=ppt, fp=temp_f)  # pyright: ignore
         # github dependencies
         elif isinstance(dependency, GitHubDependency):
@@ -432,11 +428,14 @@ class Project:
                 # get pre-commit path
                 pre_commit_path = Path(self.project_path) / ".pre-commit-config.yaml"
 
+                # ensure x.x.x for version
+                v = Version(version)
+
                 # update dependency
                 utils.update_pre_commit(
                     file_path=pre_commit_path,
                     dependency=dependency,
-                    new_version=version,
+                    new_version=f"{v.major}.{v.minor}.{v.micro}",
                 )
 
     def get_dependency(

@@ -19,6 +19,7 @@ Creates PRs for dependency updates in python projects.
 - [x] Use get_dependency
 - [ ] Implement CLI
 - [x] Create changes to files
+- [ ] Handle uv better (not group)
 - [ ] Create pull request
 - [ ] Add tests
 - [ ] Documentation

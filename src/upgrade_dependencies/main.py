@@ -312,6 +312,68 @@ def latest_versions(
     rprint(Panel(text, title=title, title_align="left"))
 
 
+@app.command()
+def update(
+    dependency: str,
+    version: str | None = None,
+    project_path: str = "",
+):
+    """_summary_.
+
+    Args:
+        dependency: _description_
+        version: _description_
+        project_path: _description_
+    """
+    project = Project(
+        project_path=project_path,
+        gh_pat=GH_PAT,
+    )
+
+    try:
+        dep = project.get_dependency(name=dependency)
+        old_ver = str(sorted(dep.specifier, key=str)[0].version)
+    except RuntimeError as e:
+        rprint(f"Cannot find {dependency} in {project.name}.")
+        raise typer.Exit(code=1) from e
+
+    asyncio.run(dep.save_data())
+
+    # get version
+    if version is None:
+        version = str(dep.get_latest_version())
+
+    # # create new branch
+    # if isinstance(dep, GitHubDependency) and dep.action:
+    #     v = Version(version)
+    #     branch_name = f"dependency/{dep.short_name}-v{v.major}"
+    # else:
+    #     branch_name = f"dependency/{dep.short_name}-{version}"
+
+    # subprocess.run(['git', 'checkout', '-b', branch_name])
+
+    # update dependency
+    project.update_dependency(dependency=dep, version=version)
+
+    # # stage changes - TODO: get files that are changed
+    # subprocess.run(['git', 'add', '.github/'])
+
+    # # commit the changes
+    # if isinstance(dep, GitHubDependency) and dep.action:
+    #     old_v = Version(old_ver)
+    #     v = Version(version)
+    #     commit_message = f"Bump {dep.package_name} from v{old_v.major} to v{v.major}"
+    # else:
+    #     commit_message = f"Bump {dep.package_name} from {old_ver} to {version}"
+
+    # subprocess.run(['git', 'commit', '-m', commit_message])
+
+    # # push the branch
+    # subprocess.run(['git', 'push', 'origin', branch_name])
+
+    # TODO: create pull request
+
+
 def main():
     """_summary_."""
     app()
