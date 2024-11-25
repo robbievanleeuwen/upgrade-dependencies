@@ -137,13 +137,11 @@ def check_dependency(
         gh_pat=GH_PAT,
     )
 
-    for d in project.dependencies:
-        if d.package_name == dependency:
-            dep = d
-            break
-    else:
+    try:
+        dep = project.get_dependency(name=dependency)
+    except RuntimeError as e:
         rprint(f"Cannot find {dependency} in {project.name}.")
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
 
     asyncio.run(dep.save_data())
 

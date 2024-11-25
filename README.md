@@ -16,7 +16,7 @@ Creates PRs for dependency updates in python projects.
 - [x] Get dependencies from pre-commit
 - [x] Github auth & async
 - [x] Create dependency abstract class
-- [ ] Use get_dependency
+- [x] Use get_dependency
 - [ ] Implement CLI
 - [x] Create changes to files
 - [ ] Create pull request
