@@ -9,8 +9,7 @@ from packaging.requirements import InvalidRequirement, Requirement
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
-from upgrade_dependencies.dependency import Dependency
-from upgrade_dependencies.github_dependency import GithubDependency
+from upgrade_dependencies.dependency import Dependency, GitHubDependency, PyPIDependency
 from upgrade_dependencies.utils import (
     extract_from_yml_directory,
     parse_pre_commit_config,
@@ -23,7 +22,6 @@ class Project:
     name: str
     gh_pat: str | None
     dependencies: list[Dependency]
-    github_dependencies: list[GithubDependency]
 
     def __init__(
         self,
@@ -53,14 +51,41 @@ class Project:
         # save GitHub PAT
         self.gh_pat = gh_pat
 
-        # create list of dependencies to add
-        project_dependencies: list[dict[str, Any]] = []
+        # initialise dependencies
+        self.dependencies = []
+
+        # get relevant paths
+        workflows_dir = Path(project_path) / ".github" / "workflows"
+        pre_commit_path = Path(project_path) / ".pre-commit-config.yaml"
+
+        # save pypi dependencies
+        self.save_pypi_dependencies(cfg=cfg, workflows_dir=workflows_dir)
+
+        # save github dependencies
+        self.save_github_dependencies(
+            workflows_dir=workflows_dir,
+            pre_commit_path=pre_commit_path,
+        )
+
+    def save_pypi_dependencies(
+        self,
+        cfg: dict[str, Any],
+        workflows_dir: Path,
+    ) -> None:
+        """_summary_.
+
+        Args:
+            cfg: _description_
+            workflows_dir: _description_
+        """
+        # create list of pypi dependencies to add
+        pypi_dependencies: list[dict[str, Any]] = []
 
         # base dependencies
         for dep in cfg["project"]["dependencies"]:
             # parse requirement
             req = parse_requirement(requirement=dep)
-            project_dependencies.append(
+            pypi_dependencies.append(
                 {
                     "package_name": req.name,
                     "specifier": req.specifier,
@@ -77,7 +102,7 @@ class Project:
             for extra, deps in cfg["project"]["optional-dependencies"].items():
                 for dep in deps:
                     req = parse_requirement(requirement=dep)
-                    project_dependencies.append(
+                    pypi_dependencies.append(
                         {
                             "package_name": req.name,
                             "specifier": req.specifier,
@@ -94,7 +119,7 @@ class Project:
             for group, deps in cfg["dependency-groups"].items():
                 for dep in deps:
                     req = parse_requirement(requirement=dep)
-                    project_dependencies.append(
+                    pypi_dependencies.append(
                         {
                             "package_name": req.name,
                             "specifier": req.specifier,
@@ -105,13 +130,8 @@ class Project:
                     )
 
         # add dependency objects
-        self.dependencies = []
-
-        for proj_dep in project_dependencies:
-            self.dependencies.append(Dependency(**proj_dep))
-
-        # workflows dir
-        workflows_dir = Path(project_path) / ".github" / "workflows"
+        for pp_dep in pypi_dependencies:
+            self.dependencies.append(PyPIDependency(**pp_dep))
 
         # uv version
         if workflows_dir.exists():
@@ -122,7 +142,7 @@ class Project:
 
             if len(uv_version) > 0:
                 self.dependencies.append(
-                    Dependency(
+                    PyPIDependency(
                         package_name="uv",
                         specifier=SpecifierSet(f"=={uv_version[0]}"),
                         base=False,
@@ -130,9 +150,21 @@ class Project:
                     ),
                 )
 
-        # parse github actions
-        self.github_dependencies = []
+    def save_github_dependencies(
+        self,
+        workflows_dir: Path,
+        pre_commit_path: Path,
+    ) -> None:
+        """_summary_.
 
+        Args:
+            workflows_dir: _description_
+            pre_commit_path: _description_
+
+        Returns:
+            _description_
+        """
+        # parse github actions
         if workflows_dir.exists():
             github_actions = extract_from_yml_directory(
                 gha_path=workflows_dir,
@@ -143,35 +175,29 @@ class Project:
             # add github actions objects
             for gha in github_actions:
                 if "@" in gha:
-                    action, version = gha.split("@", maxsplit=1)
+                    package_name, version = gha.split("@", maxsplit=1)
                 else:
-                    action = gha
+                    package_name = gha
                     version = ""
-
-                owner, repo = action.split("/", maxsplit=1)
-
-                # handle additional "/"" e.g. pandoc/actions/setup@v1
-                if "/" in repo:
-                    repo = repo.split("/")[0]
 
                 # handle branch name in tag e.g. pypa/gh-action-pypi-publish@release/v1
                 if "/" in version:
+                    full_version = version
                     version = version.split("/")[-1]
+                else:
+                    full_version = None
 
                 v = Version(version)
 
-                self.github_dependencies.append(
-                    GithubDependency(
-                        owner=owner,
-                        repo=repo,
+                self.dependencies.append(
+                    GitHubDependency(
+                        package_name=package_name,
                         specifier=SpecifierSet(f"~={v.major}.{v.minor}"),
                         action=True,
                         pre_commit=False,
+                        full_version=full_version,
                     ),
                 )
-
-        # pre-commit dir
-        pre_commit_path = Path(project_path) / ".pre-commit-config.yaml"
 
         # parse pre-commit-config
         if pre_commit_path.exists():
@@ -183,10 +209,9 @@ class Project:
                 repo = url.split("/")[-1]
                 v = Version(pc_repo["rev"])
 
-                self.github_dependencies.append(
-                    GithubDependency(
-                        owner=owner,
-                        repo=repo,
+                self.dependencies.append(
+                    GitHubDependency(
+                        package_name=f"{owner}/{repo}",
                         specifier=SpecifierSet(f"=={v}"),
                         action=False,
                         pre_commit=True,
@@ -194,31 +219,39 @@ class Project:
                 )
 
     @property
-    def base_dependencies(self) -> list[Dependency]:
+    def base_dependencies(self) -> list[PyPIDependency]:
         """_summary_.
 
         Returns:
             _description_
         """
-        return [dep for dep in self.dependencies if dep.base]
+        return [
+            dep
+            for dep in self.dependencies
+            if isinstance(dep, PyPIDependency) and dep.base
+        ]
 
     @property
-    def optional_dependencies(self) -> list[Dependency]:
+    def optional_dependencies(self) -> list[PyPIDependency]:
         """_summary_.
 
         Returns:
             _description_
         """
-        return [dep for dep in self.dependencies if dep.extra]
+        return [
+            dep
+            for dep in self.dependencies
+            if isinstance(dep, PyPIDependency) and dep.extra
+        ]
 
     @property
-    def optional_dependencies_grouped(self) -> dict[str, list[Dependency]]:
+    def optional_dependencies_grouped(self) -> dict[str, list[PyPIDependency]]:
         """_summary_.
 
         Returns:
             _description_
         """
-        grouped_deps: dict[str, list[Dependency]] = {}
+        grouped_deps: dict[str, list[PyPIDependency]] = {}
 
         for opt_dep in self.optional_dependencies:
             if isinstance(opt_dep.extra, str):
@@ -227,22 +260,26 @@ class Project:
         return grouped_deps
 
     @property
-    def group_dependencies(self) -> list[Dependency]:
+    def group_dependencies(self) -> list[PyPIDependency]:
         """_summary_.
 
         Returns:
             _description_
         """
-        return [dep for dep in self.dependencies if dep.group]
+        return [
+            dep
+            for dep in self.dependencies
+            if isinstance(dep, PyPIDependency) and dep.group
+        ]
 
     @property
-    def group_dependencies_grouped(self) -> dict[str, list[Dependency]]:
+    def group_dependencies_grouped(self) -> dict[str, list[PyPIDependency]]:
         """_summary_.
 
         Returns:
             _description_
         """
-        grouped_deps: dict[str, list[Dependency]] = {}
+        grouped_deps: dict[str, list[PyPIDependency]] = {}
 
         for group_dep in self.group_dependencies:
             if isinstance(group_dep.group, str):
@@ -251,22 +288,30 @@ class Project:
         return grouped_deps
 
     @property
-    def github_actions_dependencies(self) -> list[GithubDependency]:
+    def github_actions_dependencies(self) -> list[GitHubDependency]:
         """_summary_.
 
         Returns:
             _description_
         """
-        return [gh_dep for gh_dep in self.github_dependencies if gh_dep.action]
+        return [
+            dep
+            for dep in self.dependencies
+            if isinstance(dep, GitHubDependency) and dep.action
+        ]
 
     @property
-    def pre_commit_dependencies(self) -> list[GithubDependency]:
+    def pre_commit_dependencies(self) -> list[GitHubDependency]:
         """_summary_.
 
         Returns:
             _description_
         """
-        return [gh_dep for gh_dep in self.github_dependencies if gh_dep.pre_commit]
+        return [
+            dep
+            for dep in self.dependencies
+            if isinstance(dep, GitHubDependency) and dep.pre_commit
+        ]
 
     def fetch_all_data(self) -> None:
         """Fetches all (PyPI and GitHub) data."""
@@ -276,7 +321,11 @@ class Project:
     async def fetch_all_pypi_data(self) -> None:
         """Fetches PyPI data for all Dependency objects concurrently."""
         results = await asyncio.gather(
-            *[dep.save_pypi_data() for dep in self.dependencies],
+            *[
+                dep.save_data()
+                for dep in self.dependencies
+                if isinstance(dep, PyPIDependency)
+            ],
             return_exceptions=True,
         )
 
@@ -292,8 +341,9 @@ class Project:
         """Fetches GitHub data for all dependency objects concurrently."""
         await asyncio.gather(
             *[
-                gh_dep.save_github_data(gh_pat=self.gh_pat)
-                for gh_dep in self.github_dependencies
+                dep.save_data(gh_pat=self.gh_pat)
+                for dep in self.dependencies
+                if isinstance(dep, GitHubDependency)
             ],
             return_exceptions=True,
         )
@@ -301,6 +351,19 @@ class Project:
     def github_dependency_data_async(self) -> None:
         """Synchronously fetches GitHub data for all dependency objects."""
         asyncio.run(self.fetch_all_github_data())
+
+    def update_dependency(
+        self,
+        dependency: Dependency,
+        version: str | None = None,
+    ) -> None:
+        """_summary_.
+
+        Args:
+            dependency: _description_
+            version: _description_. Defaults to None.
+        """
+        pass
 
     def __repr__(self) -> str:
         """_summary_.

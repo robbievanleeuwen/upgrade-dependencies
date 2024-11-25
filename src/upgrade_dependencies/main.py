@@ -10,11 +10,10 @@ from rich.console import Group
 from rich.panel import Panel
 from rich.text import Text
 
-from upgrade_dependencies.dependency import Dependency
 from upgrade_dependencies.project import Project
 
 if TYPE_CHECKING:
-    from upgrade_dependencies.github_dependency import GithubDependency
+    from upgrade_dependencies.dependency import Dependency
 
 app = typer.Typer()
 GH_PAT = os.getenv("GH_PAT")
@@ -138,20 +137,15 @@ def check_dependency(
         gh_pat=GH_PAT,
     )
 
-    for d in project.dependencies + project.github_dependencies:
+    for d in project.dependencies:
         if d.package_name == dependency:
             dep = d
             break
     else:
         rprint(f"Cannot find {dependency} in {project.name}.")
-        return
+        raise typer.Exit(code=1)
 
-    if isinstance(dep, Dependency):
-        save_method = dep.save_pypi_data
-    else:
-        save_method = dep.save_github_data
-
-    asyncio.run(save_method())
+    asyncio.run(dep.save_data())
 
     title = Text("Dependency Check", style="bold")
     needs_update = dep.needs_update()
@@ -209,7 +203,7 @@ def needs_updating(
 
     title = Text("Dependencies to Update", style="bold")
     text = Text()
-    deps: list[Dependency | GithubDependency] = []
+    deps: list[Dependency] = []
 
     if base:
         deps.extend(project.base_dependencies)
@@ -283,7 +277,7 @@ def latest_versions(
 
     title = Text("Latest Versions", style="bold")
     text = Text()
-    deps: list[Dependency | GithubDependency] = []
+    deps: list[Dependency] = []
 
     if base:
         deps.extend(project.base_dependencies)
