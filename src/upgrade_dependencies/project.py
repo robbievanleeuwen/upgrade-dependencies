@@ -9,11 +9,8 @@ from packaging.requirements import InvalidRequirement, Requirement
 from packaging.specifiers import SpecifierSet
 from packaging.version import Version
 
+import upgrade_dependencies.utils as utils
 from upgrade_dependencies.dependency import Dependency, GitHubDependency, PyPIDependency
-from upgrade_dependencies.utils import (
-    extract_from_yml_directory,
-    parse_pre_commit_config,
-)
 
 
 class Project:
@@ -22,6 +19,7 @@ class Project:
     name: str
     gh_pat: str | None
     dependencies: list[Dependency]
+    project_path: str
 
     def __init__(
         self,
@@ -34,6 +32,9 @@ class Project:
             project_path: _description_
             gh_pat: _description_
         """
+        # save project path
+        self.project_path = project_path
+
         # check pyproject.toml exists
         ppt_file_path = Path(project_path) / "pyproject.toml"
 
@@ -43,10 +44,10 @@ class Project:
 
         # load pyproject.toml
         with Path(ppt_file_path).open("r") as f:
-            cfg = tomlkit.load(fp=f).unwrap()
+            ppt = tomlkit.load(fp=f).unwrap()
 
         # get project name
-        self.name = cfg["project"]["name"]
+        self.name = ppt["project"]["name"]
 
         # save GitHub PAT
         self.gh_pat = gh_pat
@@ -59,7 +60,7 @@ class Project:
         pre_commit_path = Path(project_path) / ".pre-commit-config.yaml"
 
         # save pypi dependencies
-        self.save_pypi_dependencies(cfg=cfg, workflows_dir=workflows_dir)
+        self.save_pypi_dependencies(ppt=ppt, workflows_dir=workflows_dir)
 
         # save github dependencies
         self.save_github_dependencies(
@@ -69,20 +70,20 @@ class Project:
 
     def save_pypi_dependencies(
         self,
-        cfg: dict[str, Any],
+        ppt: dict[str, Any],
         workflows_dir: Path,
     ) -> None:
         """_summary_.
 
         Args:
-            cfg: _description_
+            ppt: _description_
             workflows_dir: _description_
         """
         # create list of pypi dependencies to add
         pypi_dependencies: list[dict[str, Any]] = []
 
         # base dependencies
-        for dep in cfg["project"]["dependencies"]:
+        for dep in ppt["project"]["dependencies"]:
             # parse requirement
             req = parse_requirement(requirement=dep)
             pypi_dependencies.append(
@@ -96,10 +97,10 @@ class Project:
             )
 
         # optional dependencies
-        opt_deps = cfg["project"].get("optional-dependencies")
+        opt_deps = ppt["project"].get("optional-dependencies")
 
         if opt_deps:
-            for extra, deps in cfg["project"]["optional-dependencies"].items():
+            for extra, deps in ppt["project"]["optional-dependencies"].items():
                 for dep in deps:
                     req = parse_requirement(requirement=dep)
                     pypi_dependencies.append(
@@ -113,10 +114,10 @@ class Project:
                     )
 
         # dependency groups
-        dep_groups = cfg.get("dependency-groups")
+        dep_groups = ppt.get("dependency-groups")
 
         if dep_groups:
-            for group, deps in cfg["dependency-groups"].items():
+            for group, deps in ppt["dependency-groups"].items():
                 for dep in deps:
                     req = parse_requirement(requirement=dep)
                     pypi_dependencies.append(
@@ -135,7 +136,7 @@ class Project:
 
         # uv version
         if workflows_dir.exists():
-            uv_version = extract_from_yml_directory(
+            uv_version = utils.extract_from_yml_directory(
                 gha_path=workflows_dir,
                 variable_name="UV_VERSION",
             )
@@ -166,7 +167,7 @@ class Project:
         """
         # parse github actions
         if workflows_dir.exists():
-            github_actions = extract_from_yml_directory(
+            github_actions = utils.extract_from_yml_directory(
                 gha_path=workflows_dir,
                 variable_name="uses",
             )
@@ -201,7 +202,7 @@ class Project:
 
         # parse pre-commit-config
         if pre_commit_path.exists():
-            pre_commit_repos = parse_pre_commit_config(file_path=pre_commit_path)
+            pre_commit_repos = utils.parse_pre_commit_config(file_path=pre_commit_path)
 
             for pc_repo in pre_commit_repos:
                 url = pc_repo["repo"]
@@ -363,7 +364,99 @@ class Project:
             dependency: _description_
             version: _description_. Defaults to None.
         """
-        pass
+        # get version
+        if version is None:
+            version = str(dependency.get_latest_version())
+
+        # update pypi dependencies
+        if isinstance(dependency, PyPIDependency):
+            # handle special case uv, lives in github actions
+            if dependency.package_name == "uv":
+                workflows_dir = Path(self.project_path) / ".github" / "workflows"
+                utils.update_uv(workflows_dir, version)
+            else:
+                # load pyproject.toml
+                ppt_file_path = Path(self.project_path) / "pyproject.toml"
+
+                with Path(ppt_file_path).open("r") as f:
+                    ppt = tomlkit.load(fp=f)
+
+                # find reference to dependency in the file and update the version
+                if dependency.base:
+                    deps: list[str] = ppt["project"]["dependencies"]  # pyright: ignore
+                elif isinstance(dependency.extra, str):
+                    deps: list[str] = ppt["project"]["optional-dependencies"][  # pyright: ignore
+                        dependency.extra
+                    ]
+                elif isinstance(dependency.group, str):
+                    deps: list[str] = ppt["dependency-groups"][dependency.group]  # pyright: ignore
+                else:
+                    msg = "Unknown dependency type."
+                    raise RuntimeError(msg)
+
+                for idx, dep in enumerate(deps):
+                    req = parse_requirement(requirement=dep)
+
+                    if req.name == dependency.package_name:
+                        # build new requirement
+                        new_req = build_new_requirement(
+                            old_requirement=req,
+                            new_version=version,
+                        )
+                        deps[idx] = new_req
+                        break
+                else:
+                    msg = f"Cannot find {dependency}!"
+                    raise RuntimeError(msg)
+
+                # write new pyproject.toml file
+                temp_ppt = ppt_file_path.with_suffix(".temp")
+                with temp_ppt.open("w") as temp_f:
+                    tomlkit.dump(data=ppt, fp=temp_f)  # pyright: ignore
+        # github dependencies
+        elif isinstance(dependency, GitHubDependency):
+            if dependency.action:
+                # get workflows directory
+                workflows_dir = Path(self.project_path) / ".github" / "workflows"
+
+                # get major version release
+                v = Version(version)
+
+                # update dependency
+                utils.update_github_workflows(
+                    gha_path=workflows_dir,
+                    dependency=dependency,
+                    new_version=str(v.major),
+                )
+            elif dependency.pre_commit:
+                # get pre-commit path
+                pre_commit_path = Path(self.project_path) / ".pre-commit-config.yaml"
+
+                # update dependency
+                utils.update_pre_commit(
+                    file_path=pre_commit_path,
+                    dependency=dependency,
+                    new_version=version,
+                )
+
+    def get_dependency(
+        self,
+        name: str,
+    ) -> Dependency:
+        """_summary_.
+
+        Args:
+            name: _description_
+
+        Returns:
+            _description_
+        """
+        for dependency in self.dependencies:
+            if dependency.package_name == name:
+                return dependency
+        else:
+            msg = "Cannot find {name} in the package!"
+            raise RuntimeError(msg)
 
     def __repr__(self) -> str:
         """_summary_.
@@ -390,3 +483,22 @@ def parse_requirement(requirement: str) -> Requirement:
         raise AttributeError(msg) from e
 
     return req
+
+
+def build_new_requirement(
+    old_requirement: Requirement,
+    new_version: str,
+) -> str:
+    """_summary_.
+
+    Args:
+        old_requirement: _description_
+        new_version: _description_
+
+    Returns:
+        _description_
+    """
+    name = old_requirement.name
+    spec = sorted(old_requirement.specifier, key=str)[0].operator
+
+    return f"{name}{spec}{new_version}"

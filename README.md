@@ -1,6 +1,12 @@
 # upgrade-dependencies
 
-Creates PRs for dependency updates in python projects
+Creates PRs for dependency updates in python projects.
+
+## Limitations
+
+- Currently only supports a single specifier.
+- File structure is fixed
+- GH actions must only use major version
 
 ## TODO
 
@@ -9,9 +15,10 @@ Creates PRs for dependency updates in python projects
 - [x] Get uv dependency from github actions
 - [x] Get dependencies from pre-commit
 - [x] Github auth & async
-- [ ] Create dependency abstract class
+- [x] Create dependency abstract class
+- [ ] Use get_dependency
 - [ ] Implement CLI
-- [ ] Create changes to files
+- [x] Create changes to files
 - [ ] Create pull request
 - [ ] Add tests
 - [ ] Documentation

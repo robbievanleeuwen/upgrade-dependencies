@@ -5,7 +5,11 @@ import os
 from pathlib import Path
 from typing import Any
 
-import yaml
+from ruamel.yaml import YAML
+
+from upgrade_dependencies.dependency import GitHubDependency
+
+yaml = YAML()
 
 
 def extract_variable_from_file(
@@ -22,7 +26,7 @@ def extract_variable_from_file(
         _description_
     """
     with Path(file_path).open("r") as f:
-        data: Any = yaml.safe_load(f)
+        data: Any = yaml.load(f)  # pyright: ignore
 
     # use a stack to process items without recursion
     stack: list[Any] = [data]  # stack to hold data elements to process
@@ -87,13 +91,13 @@ def parse_pre_commit_config(file_path: Path) -> list[dict[str, str]]:
         _description_
     """
     with file_path.open("r") as f:
-        data = yaml.safe_load(f)
+        data = yaml.load(f)  # pyright: ignore
 
     repos_info: list[dict[str, str]] = []
 
     # Extract repos and their information
     if "repos" in data and isinstance(data["repos"], list):
-        for repo_entry in data["repos"]:
+        for repo_entry in data["repos"]:  # pyright: ignore
             if isinstance(repo_entry, dict):
                 repo_url = repo_entry.get("repo")  # pyright:ignore
                 rev = repo_entry.get("rev")  # pyright:ignore
@@ -101,3 +105,145 @@ def parse_pre_commit_config(file_path: Path) -> list[dict[str, str]]:
                     repos_info.append({"repo": repo_url, "rev": rev})
 
     return repos_info
+
+
+def update_uv(
+    gha_path: Path,
+    new_version: str,
+) -> None:
+    """_summary_.
+
+    Args:
+        gha_path: _description_
+        new_version: _description_
+    """
+    # Find all .yml and .yaml files in the directory
+    yaml_files = glob.glob(os.path.join(gha_path, "*.yml")) + glob.glob(
+        os.path.join(gha_path, "*.yaml"),
+    )
+
+    for file_path in yaml_files:
+        with Path(file_path).open("r") as f:
+            data: dict[str, Any] = yaml.load(f)  # pyright: ignore
+
+        try:
+            data["env"]["UV_VERSION"] = new_version
+
+            # temp_file = Path(file_path).with_suffix(".temp")
+            with Path(file_path).open("w") as temp_f:
+                yaml.dump(data, temp_f)  # pyright: ignore
+        except KeyError:
+            continue
+
+
+def update_github_workflows(
+    gha_path: Path,
+    dependency: GitHubDependency,
+    new_version: str,
+) -> None:
+    """_summary_.
+
+    Args:
+        gha_path: _description_
+        dependency: _description_
+        new_version: _description_
+    """
+    # Find all .yml and .yaml files in the directory
+    yaml_files = glob.glob(os.path.join(gha_path, "*.yml")) + glob.glob(
+        os.path.join(gha_path, "*.yaml"),
+    )
+
+    for file_path in yaml_files:
+        with Path(file_path).open("r") as f:
+            data: dict[str, Any] = yaml.load(f)  # pyright: ignore
+
+        if dependency.full_version is not None:
+            prefix = dependency.full_version.split("/")[0]
+            new_req = f"{dependency.package_name}@{prefix}/v{new_version}"
+        else:
+            new_req = f"{dependency.package_name}@v{new_version}"
+
+        changed = update_github_action_dependency(
+            d=data,  # pyright: ignore
+            dependency=dependency.package_name,
+            new_requirement=new_req,
+        )
+
+        if changed:
+            # temp_file = Path(file_path).with_suffix(".temp")
+            with Path(file_path).open("w") as temp_f:
+                yaml.dump(data, temp_f)  # pyright: ignore
+
+
+def update_github_action_dependency(
+    d: dict[str, Any],
+    dependency: str,
+    new_requirement: str,
+    changed: bool = False,
+) -> bool:
+    """Recursively replace values of a given key in a nested dictionary.
+
+    Args:
+        d: _description_
+        dependency: _description_
+        new_requirement: _description_
+        changed: _description_
+
+    Returns:
+        If the value has been replaced in any level of recursion
+    """
+    if isinstance(d, dict):  # pyright: ignore
+        for key, value in d.items():
+            if key == "uses":
+                if "@" in value:
+                    package_name, _ = value.split("@", maxsplit=1)
+                else:
+                    package_name = value
+
+                if package_name == dependency:
+                    d[key] = new_requirement
+                    changed = True
+            elif isinstance(value, dict):
+                changed = update_github_action_dependency(
+                    value,  # pyright: ignore
+                    dependency,
+                    new_requirement,
+                    changed,
+                )
+            elif isinstance(value, list):
+                for item in value:  # pyright: ignore
+                    changed = update_github_action_dependency(
+                        item,  # pyright: ignore
+                        dependency,
+                        new_requirement,
+                        changed,
+                    )
+
+    return changed
+
+
+def update_pre_commit(
+    file_path: Path,
+    dependency: GitHubDependency,
+    new_version: str,
+) -> None:
+    """_summary_.
+
+    Args:
+        file_path: _description_
+        dependency: _description_
+        new_version: _description_
+    """
+    with Path(file_path).open("r") as f:
+        data: dict[str, Any] = yaml.load(f)  # pyright: ignore
+
+    # get repo url
+    url = f"https://github.com/{dependency.owner}/{dependency.repo}"
+
+    for repo in data["repos"]:  # pyright: ignore
+        if repo["repo"] == url:
+            repo["rev"] = f"v{new_version}"
+
+    # temp_file = Path(file_path).with_suffix(".temp")
+    with Path(file_path).open("w") as temp_f:
+        yaml.dump(data, temp_f)  # pyright: ignore

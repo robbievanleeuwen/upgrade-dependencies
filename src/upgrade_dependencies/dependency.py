@@ -97,7 +97,7 @@ class Dependency:
         except NotImplementedError:
             loc = ""
 
-        return f"{self.package_name}: {self.specifier}{loc}"
+        return f"{self.package_name}{self.specifier}{loc}"
 
 
 class PyPIDependency(Dependency):
@@ -254,4 +254,4 @@ class GitHubDependency(Dependency):
         Returns:
             _description_
         """
-        return "(gha)" if self.action else "(pre-commit)"
+        return " (gha)" if self.action else " (pre-commit)"
