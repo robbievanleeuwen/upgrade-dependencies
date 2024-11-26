@@ -2,6 +2,7 @@
 
 import glob
 import os
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -247,3 +248,17 @@ def update_pre_commit(
     # temp_file = Path(file_path).with_suffix(".temp")
     with Path(file_path).open("w") as temp_f:
         yaml.dump(data, temp_f)  # pyright: ignore
+
+
+def run_shell_command(shell_args: list[str]) -> None:
+    """_summary_.
+
+    Args:
+        shell_args: _description_
+    """
+    try:
+        subprocess.run(shell_args, check=True, capture_output=True, text=True)  # noqa: S603
+    except subprocess.CalledProcessError as e:
+        msg = f"Command failed with return code {e.returncode}.\n"
+        msg += f"Error output: {e.stderr}"
+        raise RuntimeError(msg) from e

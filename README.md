@@ -17,9 +17,9 @@ Creates PRs for dependency updates in python projects.
 - [x] Github auth & async
 - [x] Create dependency abstract class
 - [x] Use get_dependency
-- [ ] Implement CLI
+- [x] Implement CLI
 - [x] Create changes to files
 - [ ] Handle uv better (not group)
-- [ ] Create pull request
+- [x] Create pull request
 - [ ] Add tests
 - [ ] Documentation

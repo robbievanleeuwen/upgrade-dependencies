@@ -5,12 +5,15 @@ import os
 from typing import TYPE_CHECKING
 
 import typer
+from packaging.version import Version
 from rich import print as rprint
 from rich.console import Group
 from rich.panel import Panel
 from rich.text import Text
 
+from upgrade_dependencies.dependency import GitHubDependency, PyPIDependency
 from upgrade_dependencies.project import Project
+from upgrade_dependencies.utils import run_shell_command
 
 if TYPE_CHECKING:
     from upgrade_dependencies.dependency import Dependency
@@ -320,11 +323,14 @@ def update(
 ):
     """_summary_.
 
+    Make sure branch locally and on github do not already exist!
+
     Args:
         dependency: _description_
         version: _description_
         project_path: _description_
     """
+    # TODO: print status
     project = Project(
         project_path=project_path,
         gh_pat=GH_PAT,
@@ -343,35 +349,69 @@ def update(
     if version is None:
         version = str(dep.get_latest_version())
 
-    # # create new branch
-    # if isinstance(dep, GitHubDependency) and dep.action:
-    #     v = Version(version)
-    #     branch_name = f"dependency/{dep.short_name}-v{v.major}"
-    # else:
-    #     branch_name = f"dependency/{dep.short_name}-{version}"
+    # create new branch
+    if isinstance(dep, GitHubDependency) and dep.action:
+        v = Version(version)
+        branch_name = f"dependency/{dep.short_name}-v{v.major}"
+    else:
+        branch_name = f"dependency/{dep.short_name}-{version}"
 
-    # subprocess.run(['git', 'checkout', '-b', branch_name])
+    run_shell_command(["git", "checkout", "-b", branch_name])
 
     # update dependency
     project.update_dependency(dependency=dep, version=version)
 
-    # # stage changes - TODO: get files that are changed
-    # subprocess.run(['git', 'add', '.github/'])
+    # stage changes - TODO: get files that are changed
+    run_shell_command(["git", "add", ".github/"])
 
-    # # commit the changes
-    # if isinstance(dep, GitHubDependency) and dep.action:
-    #     old_v = Version(old_ver)
-    #     v = Version(version)
-    #     commit_message = f"Bump {dep.package_name} from v{old_v.major} to v{v.major}"
-    # else:
-    #     commit_message = f"Bump {dep.package_name} from {old_ver} to {version}"
+    # commit the changes
+    if isinstance(dep, GitHubDependency) and dep.action:
+        old_v = Version(old_ver)
+        v = Version(version)
+        commit_message = f"Bump {dep.package_name} from v{old_v.major} to v{v.major}"
+    else:
+        commit_message = f"Bump {dep.package_name} from {old_ver} to {version}"
 
-    # subprocess.run(['git', 'commit', '-m', commit_message])
+    run_shell_command(["git", "commit", "-m", commit_message])
 
-    # # push the branch
-    # subprocess.run(['git', 'push', 'origin', branch_name])
+    # push the branch
+    run_shell_command(["git", "push", "origin", branch_name])
 
-    # TODO: create pull request
+    # create pr_body
+    if isinstance(dep, PyPIDependency):
+        url = f"https://pypi.org/project/{dep.package_name}"
+        pr_body = f"Bumps [{dep.package_name}]({url}) from {old_ver} to {version}."
+    elif isinstance(dep, GitHubDependency):
+        old_v = Version(old_ver)
+        v = Version(version)
+        url = f"https://github.com/{dep.owner}/{dep.repo}"
+        pr_body = (
+            f"Bumps [{dep.package_name}]({url}) from v{old_v.major} to v{v.major}."
+        )
+    else:
+        pr_body = ""
+
+    # create pull request
+    run_shell_command(
+        [
+            "gh",
+            "pr",
+            "create",
+            "-a",
+            "@me",
+            "--base",
+            "master",
+            "--body",
+            pr_body,
+            "--label",
+            "dependencies",
+            "--title",
+            commit_message,
+        ],
+    )
+
+    # re-checkout master
+    run_shell_command(["git", "checkout", "master"])
 
 
 def main():
