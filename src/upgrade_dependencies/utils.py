@@ -250,15 +250,40 @@ def update_pre_commit(
         yaml.dump(data, temp_f)  # pyright: ignore
 
 
-def run_shell_command(shell_args: list[str]) -> None:
+def run_shell_command(shell_args: list[str]) -> Any:
     """_summary_.
 
     Args:
         shell_args: _description_
+
+    Returns:
+        _description_
     """
     try:
-        subprocess.run(shell_args, check=True, capture_output=True, text=True)  # noqa: S603
+        res = subprocess.run(shell_args, check=True, capture_output=True, text=True)  # noqa: S603
     except subprocess.CalledProcessError as e:
         msg = f"Command failed with return code {e.returncode}.\n"
         msg += f"Error output: {e.stderr}"
         raise RuntimeError(msg) from e
+
+    return res
+
+
+def get_git_status() -> list[str]:
+    """Get the list of modified or untracked files from git status.
+
+    Returns:
+        _description_
+    """
+    result = run_shell_command(["git", "status", "-s"])
+
+    # parse the result to get the list of files
+    changed_files: list[str] = []
+
+    for line in result.stdout.strip().split("\n"):
+        status, file_path = line.split(maxsplit=1)  # status and file name
+
+        if status in ["M", "A", "D"]:  # Modified, Added, or Deleted
+            changed_files.append(file_path)
+
+    return changed_files

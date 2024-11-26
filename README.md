@@ -7,6 +7,7 @@ Creates PRs for dependency updates in python projects.
 - Currently only supports a single specifier.
 - File structure is fixed
 - GH actions must only use major version
+- Recommend to have a clean git before running (or at least no changes to pyproject etc.)
 
 ## TODO
 

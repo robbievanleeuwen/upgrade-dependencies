@@ -13,7 +13,7 @@ from rich.text import Text
 
 from upgrade_dependencies.dependency import GitHubDependency, PyPIDependency
 from upgrade_dependencies.project import Project
-from upgrade_dependencies.utils import run_shell_command
+from upgrade_dependencies.utils import get_git_status, run_shell_command
 
 if TYPE_CHECKING:
     from upgrade_dependencies.dependency import Dependency
@@ -330,12 +330,13 @@ def update(
         version: _description_
         project_path: _description_
     """
-    # TODO: print status
+    # TODO: print status of update
     project = Project(
         project_path=project_path,
         gh_pat=GH_PAT,
     )
 
+    # search for dependency and save old version
     try:
         dep = project.get_dependency(name=dependency)
         old_ver = str(sorted(dep.specifier, key=str)[0].version)
@@ -343,9 +344,10 @@ def update(
         rprint(f"Cannot find {dependency} in {project.name}.")
         raise typer.Exit(code=1) from e
 
+    # fetch data from pypi/github
     asyncio.run(dep.save_data())
 
-    # get version
+    # get latest/desired version
     if version is None:
         version = str(dep.get_latest_version())
 
@@ -358,11 +360,19 @@ def update(
 
     run_shell_command(["git", "checkout", "-b", branch_name])
 
+    # get status of files before changes
+    files_before = get_git_status()
+
     # update dependency
     project.update_dependency(dependency=dep, version=version)
 
-    # stage changes - TODO: get files that are changed
-    run_shell_command(["git", "add", ".github/"])
+    # get status of files after changes
+    files_after = get_git_status()
+
+    # get only the files that were changed
+    changed_files = [f for f in files_after if f not in files_before]
+
+    run_shell_command(["git", "add", *changed_files])
 
     # commit the changes
     if isinstance(dep, GitHubDependency) and dep.action:
