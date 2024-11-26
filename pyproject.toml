@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-upgrade-dependencies = "upgrade_dependencies.main:main"
+up-deps = "upgrade_dependencies.main:main"
 
 [dependency-groups]
 dev = [
