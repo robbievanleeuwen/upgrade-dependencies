@@ -9,6 +9,7 @@ from packaging.version import Version
 from rich import print as rprint
 from rich.console import Group
 from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.text import Text
 
 from upgrade_dependencies.dependency import GitHubDependency, PyPIDependency
@@ -330,98 +331,113 @@ def update(
         version: _description_
         project_path: _description_
     """
-    # TODO: print status of update
-    project = Project(
-        project_path=project_path,
-        gh_pat=GH_PAT,
-    )
-
-    # search for dependency and save old version
-    try:
-        dep = project.get_dependency(name=dependency)
-        old_ver = str(sorted(dep.specifier, key=str)[0].version)
-    except RuntimeError as e:
-        rprint(f"Cannot find {dependency} in {project.name}.")
-        raise typer.Exit(code=1) from e
-
-    # fetch data from pypi/github
-    asyncio.run(dep.save_data())
-
-    # get latest/desired version
-    if version is None:
-        version = str(dep.get_latest_version())
-
-    # create new branch
-    if isinstance(dep, GitHubDependency) and dep.action:
-        v = Version(version)
-        branch_name = f"dependency/{dep.short_name}-v{v.major}"
-    else:
-        branch_name = f"dependency/{dep.short_name}-{version}"
-
-    run_shell_command(["git", "checkout", "-b", branch_name])
-
-    # get status of files before changes
-    files_before = get_git_status()
-
-    # update dependency
-    project.update_dependency(dependency=dep, version=version)
-
-    # get status of files after changes
-    files_after = get_git_status()
-
-    # get only the files that were changed
-    changed_files = [f for f in files_after if f not in files_before]
-
-    run_shell_command(["git", "add", *changed_files])
-
-    # commit the changes
-    if isinstance(dep, GitHubDependency) and dep.action:
-        old_v = Version(old_ver)
-        v = Version(version)
-        commit_message = f"Bump {dep.package_name} from v{old_v.major} to v{v.major}"
-    else:
-        commit_message = f"Bump {dep.package_name} from {old_ver} to {version}"
-
-    run_shell_command(["git", "commit", "-m", commit_message])
-
-    # push the branch
-    run_shell_command(["git", "push", "origin", branch_name])
-
-    # create pr_body
-    if isinstance(dep, PyPIDependency):
-        url = f"https://pypi.org/project/{dep.package_name}"
-        pr_body = f"Bumps [{dep.package_name}]({url}) from {old_ver} to {version}."
-    elif isinstance(dep, GitHubDependency):
-        old_v = Version(old_ver)
-        v = Version(version)
-        url = f"https://github.com/{dep.owner}/{dep.repo}"
-        pr_body = (
-            f"Bumps [{dep.package_name}]({url}) from v{old_v.major} to v{v.major}."
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        transient=True,
+    ) as progress:
+        task = progress.add_task("Creating project...")
+        project = Project(
+            project_path=project_path,
+            gh_pat=GH_PAT,
         )
-    else:
-        pr_body = ""
 
-    # create pull request
-    run_shell_command(
-        [
-            "gh",
-            "pr",
-            "create",
-            "-a",
-            "@me",
-            "--base",
-            "master",
-            "--body",
-            pr_body,
-            "--label",
-            "dependencies",
-            "--title",
-            commit_message,
-        ],
-    )
+        # search for dependency and save old version
+        try:
+            dep = project.get_dependency(name=dependency)
+            old_ver = str(sorted(dep.specifier, key=str)[0].version)
+        except RuntimeError as e:
+            rprint(f"Cannot find {dependency} in {project.name}.")
+            raise typer.Exit(code=1) from e
 
-    # re-checkout master
-    run_shell_command(["git", "checkout", "master"])
+        # fetch data from pypi/github
+        progress.update(task, description="Fetching dependency data...")
+        asyncio.run(dep.save_data())
+
+        # get latest/desired version
+        if version is None:
+            version = str(dep.get_latest_version())
+
+        # create new branch
+        progress.update(task, description="Creating new branch...")
+        if isinstance(dep, GitHubDependency) and dep.action:
+            v = Version(version)
+            branch_name = f"dependency/{dep.short_name}-v{v.major}"
+        else:
+            branch_name = f"dependency/{dep.short_name}-{version}"
+
+        run_shell_command(["git", "checkout", "-b", branch_name])
+
+        # get status of files before changes
+        progress.update(task, description="Updating dependency...")
+        files_before = get_git_status()
+
+        # update dependency
+        project.update_dependency(dependency=dep, version=version)
+
+        # get status of files after changes
+        files_after = get_git_status()
+
+        # get only the files that were changed
+        changed_files = [f for f in files_after if f not in files_before]
+
+        run_shell_command(["git", "add", *changed_files])
+
+        # commit the changes
+        progress.update(task, description="Committing changes...")
+        if isinstance(dep, GitHubDependency) and dep.action:
+            old_v = Version(old_ver)
+            v = Version(version)
+            commit_message = (
+                f"Bump {dep.package_name} from v{old_v.major} to v{v.major}"
+            )
+        else:
+            commit_message = f"Bump {dep.package_name} from {old_ver} to {version}"
+
+        run_shell_command(["git", "commit", "-m", commit_message])
+
+        # push the branch
+        progress.update(task, description="Pushing changes to GitHub...")
+        run_shell_command(["git", "push", "origin", branch_name])
+
+        # create pr_body
+        progress.update(task, description="Creating pull request...")
+        if isinstance(dep, PyPIDependency):
+            url = f"https://pypi.org/project/{dep.package_name}"
+            pr_body = f"Bumps [{dep.package_name}]({url}) from {old_ver} to {version}."
+        elif isinstance(dep, GitHubDependency):
+            old_v = Version(old_ver)
+            v = Version(version)
+            url = f"https://github.com/{dep.owner}/{dep.repo}"
+            pr_body = (
+                f"Bumps [{dep.package_name}]({url}) from v{old_v.major} to v{v.major}."
+            )
+        else:
+            pr_body = ""
+
+        # create pull request
+        pr = run_shell_command(
+            [
+                "gh",
+                "pr",
+                "create",
+                "-a",
+                "@me",
+                "--base",
+                "master",
+                "--body",
+                pr_body,
+                "--label",
+                "dependencies",
+                "--title",
+                commit_message,
+            ],
+        )
+
+        # re-checkout master
+        run_shell_command(["git", "checkout", "master"])
+
+    rprint(f"✅Dependency updated! View the pull request at {pr.stdout}")
 
 
 def main():
