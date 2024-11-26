@@ -1,6 +1,7 @@
 # upgrade-dependencies
 
-Creates PRs for dependency updates in python projects.
+CLI tool to check for dependency updates in your python project. Automatically creates
+GitHub pull requests for dependencies you wish to update!
 
 ## Limitations
 
@@ -22,5 +23,5 @@ Creates PRs for dependency updates in python projects.
 - [x] Create changes to files
 - [ ] Handle uv better (not group)
 - [x] Create pull request
-- [ ] Add tests
 - [ ] Documentation
+- [ ] Add tests

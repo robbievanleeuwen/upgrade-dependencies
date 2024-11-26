@@ -250,21 +250,32 @@ def update_pre_commit(
         yaml.dump(data, temp_f)  # pyright: ignore
 
 
-def run_shell_command(shell_args: list[str]) -> Any:
+def run_shell_command(
+    shell_args: list[str],
+    suppress_errors: bool = False,
+) -> Any:
     """_summary_.
 
     Args:
         shell_args: _description_
+        suppress_errors: _description_
 
     Returns:
         _description_
     """
-    try:
-        res = subprocess.run(shell_args, check=True, capture_output=True, text=True)  # noqa: S603
-    except subprocess.CalledProcessError as e:
-        msg = f"Command failed with return code {e.returncode}.\n"
-        msg += f"Error output: {e.stderr}"
-        raise RuntimeError(msg) from e
+    if suppress_errors:
+        res = subprocess.run(  # noqa: S603
+            shell_args,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    else:
+        try:
+            res = subprocess.run(shell_args, check=True, capture_output=True, text=True)  # noqa: S603
+        except subprocess.CalledProcessError as e:
+            msg = f"Command failed with return code {e.returncode}.\n"
+            msg += f"Error output: {e.stderr}"
+            raise RuntimeError(msg) from e
 
     return res
 
@@ -283,7 +294,7 @@ def get_git_status() -> list[str]:
     for line in result.stdout.strip().split("\n"):
         status, file_path = line.split(maxsplit=1)  # status and file name
 
-        if status in ["M", "A", "D"]:  # Modified, Added, or Deleted
+        if status in ["M", "A", "D"]:  # modified, added, or deleted
             changed_files.append(file_path)
 
     return changed_files

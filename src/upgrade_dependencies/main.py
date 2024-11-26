@@ -372,8 +372,18 @@ def update(
         progress.update(task, description="Updating dependency...")
         files_before = get_git_status()
 
+        # warning if there are changed files
+        if len(files_before) > 0:
+            msg = ":warning-emoji: [italic]There are uncomitted changes in your current"
+            msg += " branch. upgrade-dependencies will only commit files that were"
+            msg += " unmodified prior to running [bold]update[/bold][/italic]."
+            rprint(msg)
+
         # update dependency
         project.update_dependency(dependency=dep, version=version)
+
+        # run uv.lock, don't worry if it doesn't work (i.e. uv not installed)
+        run_shell_command(["uv", "lock"], suppress_errors=True)
 
         # get status of files after changes
         files_after = get_git_status()
@@ -381,6 +391,7 @@ def update(
         # get only the files that were changed
         changed_files = [f for f in files_after if f not in files_before]
 
+        # git add the changed files
         run_shell_command(["git", "add", *changed_files])
 
         # commit the changes
@@ -396,7 +407,7 @@ def update(
 
         run_shell_command(["git", "commit", "-m", commit_message])
 
-        # push the branch
+        # push the branch to GitHub
         progress.update(task, description="Pushing changes to GitHub...")
         run_shell_command(["git", "push", "origin", branch_name])
 
@@ -437,7 +448,7 @@ def update(
         # re-checkout master
         run_shell_command(["git", "checkout", "master"])
 
-    rprint(f"✅Dependency updated! View the pull request at {pr.stdout}")
+    rprint(f"✅ {dep.package_name} updated! View the pull request at {pr.stdout}")
 
 
 def main():
