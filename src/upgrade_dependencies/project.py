@@ -90,6 +90,7 @@ class Project:
                 {
                     "package_name": req.name,
                     "specifier": req.specifier,
+                    "extras": list(req.extras),
                     "base": True,
                     "extra": None,
                     "group": None,
@@ -107,6 +108,7 @@ class Project:
                         {
                             "package_name": req.name,
                             "specifier": req.specifier,
+                            "extras": list(req.extras),
                             "base": False,
                             "extra": extra,
                             "group": None,
@@ -124,6 +126,7 @@ class Project:
                         {
                             "package_name": req.name,
                             "specifier": req.specifier,
+                            "extras": list(req.extras),
                             "base": False,
                             "extra": None,
                             "group": group,
@@ -146,6 +149,7 @@ class Project:
                     PyPIDependency(
                         package_name="uv",
                         specifier=SpecifierSet(f"=={uv_version[0]}"),
+                        extras=[],
                         base=False,
                         group="uv",
                     ),
@@ -209,6 +213,7 @@ class Project:
                 owner = url.split("/")[-2]
                 repo = url.split("/")[-1]
                 v = Version(pc_repo["rev"])
+                has_v = pc_repo["rev"][0] == "v"
 
                 self.dependencies.append(
                     GitHubDependency(
@@ -216,6 +221,7 @@ class Project:
                         specifier=SpecifierSet(f"=={v}"),
                         action=False,
                         pre_commit=True,
+                        has_v=has_v,
                     ),
                 )
 
@@ -346,7 +352,6 @@ class Project:
                 for dep in self.dependencies
                 if isinstance(dep, GitHubDependency)
             ],
-            return_exceptions=True,
         )
 
     def github_dependency_data_async(self) -> None:
@@ -498,6 +503,8 @@ def build_new_requirement(
         _description_
     """
     name = old_requirement.name
+    extras = list(old_requirement.extras)
     spec = sorted(old_requirement.specifier, key=str)[0].operator
+    str_extras = f"[{",".join(extras)}]" if len(extras) > 0 else ""
 
-    return f"{name}{spec}{new_version}"
+    return f"{name}{str_extras}{spec}{new_version}"

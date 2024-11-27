@@ -33,7 +33,7 @@ def list_dependencies():
     text = Text()
 
     for idx, base_dep in enumerate(project.base_dependencies):
-        text.append(base_dep.package_name)
+        text.append(base_dep.package_plus_extras)
         text.append(str(base_dep.specifier), style="green")
 
         if idx < len(project.base_dependencies) - 1:
@@ -50,7 +50,7 @@ def list_dependencies():
         text = Text()
 
         for idx, opt_dep in enumerate(opt_deps):
-            text.append(opt_dep.package_name)
+            text.append(opt_dep.package_plus_extras)
             text.append(str(opt_dep.specifier), style="green")
 
             if idx < len(opt_deps) - 1:
@@ -73,7 +73,7 @@ def list_dependencies():
         text = Text()
 
         for idx, group_dep in enumerate(group_deps):
-            text.append(group_dep.package_name)
+            text.append(group_dep.package_plus_extras)
             text.append(str(group_dep.specifier), style="green")
 
             if idx < len(group_deps) - 1:
@@ -320,7 +320,7 @@ def update(
             dep = project.get_dependency(name=dependency)
             old_ver = str(sorted(dep.specifier, key=str)[0].version)
         except RuntimeError as e:
-            rprint(f"Cannot find {dependency} in {project.name}.")
+            rprint(f":no_entry_sign: Cannot find {dependency} in {project.name}.")
             raise typer.Exit(code=1) from e
 
         # fetch data from pypi/github
@@ -390,12 +390,16 @@ def update(
             url = f"https://pypi.org/project/{dep.package_name}"
             pr_body = f"Bumps [{dep.package_name}]({url}) from {old_ver} to {version}."
         elif isinstance(dep, GitHubDependency):
-            old_v = Version(old_ver)
-            v = Version(version)
             url = f"https://github.com/{dep.owner}/{dep.repo}"
-            pr_body = (
-                f"Bumps [{dep.package_name}]({url}) from v{old_v.major} to v{v.major}."
-            )
+            if dep.action:
+                old_v = Version(old_ver)
+                v = Version(version)
+                pr_body = f"Bumps [{dep.package_name}]({url}) from v{old_v.major} to"
+                pr_body += f" v{v.major}."
+            else:
+                pr_body = (
+                    f"Bumps [{dep.package_name}]({url}) from {old_ver} to {version}."
+                )
         else:
             pr_body = ""
 
@@ -430,8 +434,3 @@ def update(
 def format_yml():
     """Formats the workflow and pre-commit config yaml files."""
     utils.format_all_yml_files()
-
-
-def main():
-    """_summary_."""
-    app()

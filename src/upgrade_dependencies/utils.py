@@ -243,7 +243,8 @@ def update_pre_commit(
 
     for repo in data["repos"]:  # pyright: ignore
         if repo["repo"] == url:
-            repo["rev"] = f"v{new_version}"
+            v_str = "v" if dependency.has_v else ""
+            repo["rev"] = f"{v_str}{new_version}"
 
     # temp_file = Path(file_path).with_suffix(".temp")
     with Path(file_path).open("w") as temp_f:
@@ -292,10 +293,11 @@ def get_git_status() -> list[str]:
     changed_files: list[str] = []
 
     for line in result.stdout.strip().split("\n"):
-        status, file_path = line.split(maxsplit=1)  # status and file name
+        if len(line) > 0:
+            status, file_path = line.split(maxsplit=1)  # status and file name
 
-        if status in ["M", "A", "D"]:  # modified, added, or deleted
-            changed_files.append(file_path)
+            if status in ["M", "A", "D"]:  # modified, added, or deleted
+                changed_files.append(file_path)
 
     return changed_files
 

@@ -116,6 +116,7 @@ class PyPIDependency(Dependency):
         self,
         package_name: str,
         specifier: SpecifierSet,
+        extras: list[str],
         base: bool = True,
         extra: str | None = None,
         group: str | None = None,
@@ -125,6 +126,7 @@ class PyPIDependency(Dependency):
         Args:
             package_name: _description_
             specifier: _description_
+            extras: _description_
             base: _description_. Defaults to True.
             extra: _description_. Defaults to None.
             group: _description_. Defaults to None.
@@ -133,6 +135,7 @@ class PyPIDependency(Dependency):
             package_name=canonicalize_name(package_name),
             specifier=specifier,
         )
+        self.extras = extras
         self.base = base
         self.extra = extra
         self.group = group
@@ -177,6 +180,17 @@ class PyPIDependency(Dependency):
         """
         return self.package_name
 
+    @property
+    def package_plus_extras(self) -> str:
+        """_summary_.
+
+        Returns:
+            _description_
+        """
+        str_extras = f"[{",".join(self.extras)}]" if len(self.extras) > 0 else ""
+
+        return f"{self.package_name}{str_extras}"
+
 
 class GitHubDependency(Dependency):
     """_summary_."""
@@ -188,6 +202,7 @@ class GitHubDependency(Dependency):
         action: bool,
         pre_commit: bool,
         full_version: str | None = None,
+        has_v: bool = True,
     ) -> None:
         """_summary_.
 
@@ -197,6 +212,7 @@ class GitHubDependency(Dependency):
             action: _description_
             pre_commit: _description_
             full_version: _description_
+            has_v: _description_
         """
         super().__init__(package_name=package_name, specifier=specifier)
 
@@ -211,6 +227,7 @@ class GitHubDependency(Dependency):
         self.action = action
         self.pre_commit = pre_commit
         self.full_version = full_version
+        self.has_v = has_v
 
     def get_latest_version(self) -> Version:
         """Gets the latest version of the dependency from GitHub.

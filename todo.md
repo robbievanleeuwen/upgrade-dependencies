@@ -10,8 +10,8 @@
 - [x] Implement CLI
 - [x] Create changes to files
 - [x] Create pull request
-- [ ] Add format yml files
+- [x] Add format yml files
 - [ ] Documentation
 - [ ] Handle uv better (not group)
-- [ ] Handle pre-commit yml (not yaml)
+- [ ] Handle pre-commit yml extension (not yaml)
 - [ ] Add tests
