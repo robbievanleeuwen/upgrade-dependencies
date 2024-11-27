@@ -23,7 +23,7 @@ class Project:
 
     def __init__(
         self,
-        project_path: str,
+        project_path: str = "",
         gh_pat: str | None = None,
     ) -> None:
         """_summary_.

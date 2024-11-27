@@ -24,16 +24,9 @@ GH_PAT = os.getenv("GH_PAT")
 
 
 @app.command()
-def list_dependencies(project_path: str = ""):
-    """Checks whether a dependency needs updating.
-
-    Args:
-        project_path: Path to the project. Defaults to the current working directory.
-    """
-    project = Project(
-        project_path=project_path,
-        gh_pat=GH_PAT,
-    )
+def list_dependencies():
+    """Checks whether a dependency needs updating."""
+    project = Project(gh_pat=GH_PAT)
 
     # base dependencies
     title = Text("Base Dependencies", style="bold")
@@ -126,20 +119,13 @@ def list_dependencies(project_path: str = ""):
 
 
 @app.command()
-def check_dependency(
-    dependency: str,
-    project_path: str = "",
-):
+def check_dependency(dependency: str):
     """Checks whether a dependency needs updating.
 
     Args:
         dependency: Name of the dependency to check.
-        project_path: Path to the project. Defaults to the current working directory.
     """
-    project = Project(
-        project_path=project_path,
-        gh_pat=GH_PAT,
-    )
+    project = Project(gh_pat=GH_PAT)
 
     try:
         dep = project.get_dependency(name=dependency)
@@ -170,7 +156,6 @@ def check_dependency(
 
 @app.command()
 def needs_updating(
-    project_path: str = "",
     base: bool = True,
     optional_deps: bool = True,
     group_deps: bool = True,
@@ -180,7 +165,6 @@ def needs_updating(
     """List the dependencies that need updating.
 
     Args:
-        project_path: Path to the project. Defaults to the current working directory.
         base: If set to True, includes the base dependencies. Defaults to True.
         optional_deps: If set to True, includes the optional dependencies. Defaults to
             True.
@@ -191,10 +175,7 @@ def needs_updating(
             True.
     """
     # create project object
-    project = Project(
-        project_path=project_path,
-        gh_pat=GH_PAT,
-    )
+    project = Project(gh_pat=GH_PAT)
 
     # fetch relevant data
     if base or optional_deps or group_deps:
@@ -244,7 +225,6 @@ def needs_updating(
 
 @app.command()
 def latest_versions(
-    project_path: str = "",
     base: bool = True,
     optional_deps: bool = True,
     group_deps: bool = True,
@@ -254,7 +234,6 @@ def latest_versions(
     """List the dependencies that aren't pinned to the latest version.
 
     Args:
-        project_path: Path to the project. Defaults to the current working directory.
         base: If set to True, includes the base dependencies. Defaults to True.
         optional_deps: If set to True, includes the optional dependencies. Defaults to
             True.
@@ -265,10 +244,7 @@ def latest_versions(
             True.
     """
     # create project object
-    project = Project(
-        project_path=project_path,
-        gh_pat=GH_PAT,
-    )
+    project = Project(gh_pat=GH_PAT)
 
     # fetch relevant data
     if base or optional_deps or group_deps:
@@ -320,7 +296,7 @@ def latest_versions(
 def update(
     dependency: str,
     version: str | None = None,
-    project_path: str = "",
+    target_branch: str = "master",
 ):
     """_summary_.
 
@@ -329,7 +305,7 @@ def update(
     Args:
         dependency: _description_
         version: _description_
-        project_path: _description_
+        target_branch: _description_
     """
     with Progress(
         SpinnerColumn(),
@@ -337,10 +313,7 @@ def update(
         transient=True,
     ) as progress:
         task = progress.add_task("Creating project...")
-        project = Project(
-            project_path=project_path,
-            gh_pat=GH_PAT,
-        )
+        project = Project(gh_pat=GH_PAT)
 
         # search for dependency and save old version
         try:
@@ -435,7 +408,7 @@ def update(
                 "-a",
                 "@me",
                 "--base",
-                "master",
+                target_branch,
                 "--body",
                 pr_body,
                 "--label",
@@ -445,10 +418,12 @@ def update(
             ],
         )
 
-        # re-checkout master
-        run_shell_command(["git", "checkout", "master"])
+        # re-checkout master branch
+        run_shell_command(["git", "checkout", target_branch])
 
-    rprint(f"✅ {dep.package_name} updated! View the pull request at {pr.stdout}")
+    msg = f"✅ [bold]{dep.package_name}[/bold] updated! View the pull request at"
+    msg += f" {pr.stdout}"
+    rprint(msg)
 
 
 def main():
