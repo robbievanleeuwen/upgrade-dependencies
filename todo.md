@@ -9,8 +9,9 @@
 - [x] Use get_dependency
 - [x] Implement CLI
 - [x] Create changes to files
-- [ ] Handle uv better (not group)
 - [x] Create pull request
 - [ ] Add format yml files
 - [ ] Documentation
+- [ ] Handle uv better (not group)
+- [ ] Handle pre-commit yml (not yaml)
 - [ ] Add tests

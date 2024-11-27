@@ -298,3 +298,29 @@ def get_git_status() -> list[str]:
             changed_files.append(file_path)
 
     return changed_files
+
+
+def format_all_yml_files() -> None:
+    """Formats the workflow and pre-commit config yaml files."""
+    # pre-commit
+    pre_commit_path = Path(".pre-commit-config.yaml")
+
+    with pre_commit_path.open("r") as f:
+        data: dict[str, Any] = yaml.load(f)  # pyright: ignore
+
+    with pre_commit_path.open("w") as temp_f:
+        yaml.dump(data, temp_f)  # pyright: ignore
+
+    # workflows
+    workflows_dir = Path("") / ".github" / "workflows"
+
+    yaml_files = glob.glob(os.path.join(workflows_dir, "*.yml")) + glob.glob(
+        os.path.join(workflows_dir, "*.yaml"),
+    )
+
+    for file_path in yaml_files:
+        with Path(file_path).open("r") as f:
+            data: dict[str, Any] = yaml.load(f)  # pyright: ignore
+
+        with Path(file_path).open("w") as temp_f:
+            yaml.dump(data, temp_f)  # pyright: ignore

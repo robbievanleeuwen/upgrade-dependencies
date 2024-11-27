@@ -12,9 +12,9 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.text import Text
 
+import upgrade_dependencies.utils as utils
 from upgrade_dependencies.dependency import GitHubDependency, PyPIDependency
 from upgrade_dependencies.project import Project
-from upgrade_dependencies.utils import get_git_status, run_shell_command
 
 if TYPE_CHECKING:
     from upgrade_dependencies.dependency import Dependency
@@ -339,11 +339,11 @@ def update(
         else:
             branch_name = f"dependency/{dep.short_name}-{version}"
 
-        run_shell_command(["git", "checkout", "-b", branch_name])
+        utils.run_shell_command(["git", "checkout", "-b", branch_name])
 
         # get status of files before changes
         progress.update(task, description="Updating dependency...")
-        files_before = get_git_status()
+        files_before = utils.get_git_status()
 
         # warning if there are changed files
         if len(files_before) > 0:
@@ -356,16 +356,16 @@ def update(
         project.update_dependency(dependency=dep, version=version)
 
         # run uv.lock, don't worry if it doesn't work (i.e. uv not installed)
-        run_shell_command(["uv", "lock"], suppress_errors=True)
+        utils.run_shell_command(["uv", "lock"], suppress_errors=True)
 
         # get status of files after changes
-        files_after = get_git_status()
+        files_after = utils.get_git_status()
 
         # get only the files that were changed
         changed_files = [f for f in files_after if f not in files_before]
 
         # git add the changed files
-        run_shell_command(["git", "add", *changed_files])
+        utils.run_shell_command(["git", "add", *changed_files])
 
         # commit the changes
         progress.update(task, description="Committing changes...")
@@ -378,11 +378,11 @@ def update(
         else:
             commit_message = f"Bump {dep.package_name} from {old_ver} to {version}"
 
-        run_shell_command(["git", "commit", "-m", commit_message])
+        utils.run_shell_command(["git", "commit", "-m", commit_message])
 
         # push the branch to GitHub
         progress.update(task, description="Pushing changes to GitHub...")
-        run_shell_command(["git", "push", "origin", branch_name])
+        utils.run_shell_command(["git", "push", "origin", branch_name])
 
         # create pr_body
         progress.update(task, description="Creating pull request...")
@@ -400,7 +400,7 @@ def update(
             pr_body = ""
 
         # create pull request
-        pr = run_shell_command(
+        pr = utils.run_shell_command(
             [
                 "gh",
                 "pr",
@@ -419,11 +419,17 @@ def update(
         )
 
         # re-checkout master branch
-        run_shell_command(["git", "checkout", target_branch])
+        utils.run_shell_command(["git", "checkout", target_branch])
 
     msg = f"✅ [bold]{dep.package_name}[/bold] updated! View the pull request at"
     msg += f" {pr.stdout}"
     rprint(msg)
+
+
+@app.command()
+def format_yml():
+    """Formats the workflow and pre-commit config yaml files."""
+    utils.format_all_yml_files()
 
 
 def main():
