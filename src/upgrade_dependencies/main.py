@@ -2,7 +2,7 @@
 
 import asyncio
 import os
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Annotated
 
 import typer
 from packaging.version import Version
@@ -25,7 +25,7 @@ GH_PAT = os.getenv("GH_PAT")
 
 @app.command()
 def list_dependencies():
-    """Checks whether a dependency needs updating."""
+    """List all the dependencies for the project."""
     project = Project(gh_pat=GH_PAT)
 
     # base dependencies
@@ -119,12 +119,10 @@ def list_dependencies():
 
 
 @app.command()
-def check_dependency(dependency: str):
-    """Checks whether a dependency needs updating.
-
-    Args:
-        dependency: Name of the dependency to check.
-    """
+def check_dependency(
+    dependency: Annotated[str, typer.Argument(help="Name of the dependency to check")],
+):
+    """Checks whether a dependency needs updating."""
     project = Project(gh_pat=GH_PAT)
 
     try:
@@ -156,24 +154,22 @@ def check_dependency(dependency: str):
 
 @app.command()
 def needs_updating(
-    base: bool = True,
-    optional_deps: bool = True,
-    group_deps: bool = True,
-    github_actions: bool = True,
-    pre_commit: bool = True,
+    base: Annotated[bool, typer.Option(help="Include base dependencies")] = True,
+    optional_deps: Annotated[
+        bool,
+        typer.Option(help="Include optional dependencies"),
+    ] = True,
+    group_deps: Annotated[bool, typer.Option(help="Include dependency groups")] = True,
+    github_actions: Annotated[
+        bool,
+        typer.Option(help="Include GitHub actions dependencies"),
+    ] = True,
+    pre_commit: Annotated[
+        bool,
+        typer.Option(help="Include pre-commit dependencies"),
+    ] = True,
 ):
-    """List the dependencies that need updating.
-
-    Args:
-        base: If set to True, includes the base dependencies. Defaults to True.
-        optional_deps: If set to True, includes the optional dependencies. Defaults to
-            True.
-        group_deps: If set to True, includes the dependency groups. Defaults to True.
-        github_actions: If set to True, includes the github actions dependencies.
-            Defaults to True.
-        pre_commit: If set to True, includes the pre-commit dependencies. Defaults to
-            True.
-    """
+    """Lists the dependencies that need updating."""
     # create project object
     project = Project(gh_pat=GH_PAT)
 
@@ -225,24 +221,22 @@ def needs_updating(
 
 @app.command()
 def latest_versions(
-    base: bool = True,
-    optional_deps: bool = True,
-    group_deps: bool = True,
-    github_actions: bool = False,
-    pre_commit: bool = True,
+    base: Annotated[bool, typer.Option(help="Include base dependencies")] = True,
+    optional_deps: Annotated[
+        bool,
+        typer.Option(help="Include optional dependencies"),
+    ] = True,
+    group_deps: Annotated[bool, typer.Option(help="Include dependency groups")] = True,
+    github_actions: Annotated[
+        bool,
+        typer.Option(help="Include GitHub actions dependencies"),
+    ] = False,
+    pre_commit: Annotated[
+        bool,
+        typer.Option(help="Include pre-commit dependencies"),
+    ] = True,
 ):
-    """List the dependencies that aren't pinned to the latest version.
-
-    Args:
-        base: If set to True, includes the base dependencies. Defaults to True.
-        optional_deps: If set to True, includes the optional dependencies. Defaults to
-            True.
-        group_deps: If set to True, includes the dependency groups. Defaults to True.
-        github_actions: If set to True, includes the github actions dependencies.
-            Defaults to False.
-        pre_commit: If set to True, includes the pre-commit dependencies. Defaults to
-            True.
-    """
+    """List the dependencies that aren't specified to the latest version."""
     # create project object
     project = Project(gh_pat=GH_PAT)
 
@@ -294,18 +288,24 @@ def latest_versions(
 
 @app.command()
 def update(
-    dependency: str,
-    version: str | None = None,
-    target_branch: str = "master",
+    dependency: Annotated[str, typer.Argument(help="Dependency to update")],
+    version: Annotated[
+        str | None,
+        typer.Option(help="Version to update to, latest version if not specified"),
+    ] = None,
+    target_branch: Annotated[
+        str,
+        typer.Option(help="Name of the branch to merge PR to"),
+    ] = "master",
 ):
-    """_summary_.
+    """Updates a dependency to a specific (or latest) version.
 
-    Make sure branch locally and on github do not already exist!
+    Makes changes to the dependency specification locally and creates a GitHub pull
+    request on a new branch (branch name = dependency/{package_name}-{version}). Make
+    sure this branch name does not exist locally or on GitHub.
 
-    Args:
-        dependency: _description_
-        version: _description_
-        target_branch: _description_
+    Requires git and the GitHub CLI to be installed. It is recommended to have a clean
+    git before running this command.
     """
     with Progress(
         SpinnerColumn(),

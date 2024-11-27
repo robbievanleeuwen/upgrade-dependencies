@@ -11,7 +11,8 @@
 - [x] Create changes to files
 - [x] Create pull request
 - [x] Add format yml files
-- [ ] Documentation
+- [x] Documentation
+- [ ] Add release command
 - [ ] Handle uv better (not group)
 - [ ] Handle pre-commit yml extension (not yaml)
 - [ ] Add tests

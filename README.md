@@ -14,8 +14,10 @@ uv tool install upgrade-dependencies
 You can then navigate to your project directory and execute:
 
 ```
-uvx upgrade-dependencies [OPTIONS] [COMMAND]
+uvx upgrade-dependencies [OPTIONS] COMMAND [ARGS]...
 ```
+
+See the [CLI documentation](docs/usage.md) for information about how each command works.
 
 ### Requirements
 
