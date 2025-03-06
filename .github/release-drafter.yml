@@ -53,7 +53,7 @@ version-resolver:
 # Custom text at start of release
 header: >
 
-  Initial release.
+  This release fixes a bug that ensures `GH_PAT` is used when requesting updates.
 
 template: |
 
