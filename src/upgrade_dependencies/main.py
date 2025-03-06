@@ -131,7 +131,10 @@ def check_dependency(
         rprint(f"Cannot find {dependency} in {project.name}.")
         raise typer.Exit(code=1) from e
 
-    asyncio.run(dep.save_data())
+    if isinstance(dep, GitHubDependency):
+        asyncio.run(dep.save_data(gh_pat=GH_PAT))
+    else:
+        asyncio.run(dep.save_data())
 
     title = Text("Dependency Check", style="bold")
     needs_update = dep.needs_update()
@@ -325,7 +328,11 @@ def update(
 
         # fetch data from pypi/github
         progress.update(task, description="Fetching dependency data...")
-        asyncio.run(dep.save_data())
+
+        if isinstance(dep, GitHubDependency):
+            asyncio.run(dep.save_data(gh_pat=GH_PAT))
+        else:
+            asyncio.run(dep.save_data())
 
         # get latest/desired version
         if version is None:
