@@ -13,6 +13,7 @@
 - [x] Add format yml files
 - [x] Documentation
 - [ ] Add release command
+- [ ] Fetch github repo from pypi and use it for good!
 - [ ] Handle uv better (not group)
 - [ ] Handle pre-commit yml extension (not yaml)
 - [ ] Add tests
